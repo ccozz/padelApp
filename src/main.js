@@ -52,6 +52,10 @@ const pairName = document.getElementById('pairName');
 const playerOneSelect = document.getElementById('playerOneSelect');
 const playerTwoSelect = document.getElementById('playerTwoSelect');
 const playersList = document.getElementById('playersList');
+const playersModal = document.getElementById('playersModal');
+const openPlayersModal = document.getElementById('openPlayersModal');
+const closePlayersModal = document.getElementById('closePlayersModal');
+const openPairsTab = document.getElementById('openPairsTab');
 const playerForm = document.getElementById('playerForm');
 const playerId = document.getElementById('playerId');
 const playerFirstName = document.getElementById('playerFirstName');
@@ -138,6 +142,28 @@ const hasActiveTournament = (state) =>
   Boolean(state.tournament.createdAt) && state.tournament.status !== 'Torneo archivado';
 
 const canEditTournament = () => isAdminUnlocked() && !isTournamentFinalized();
+
+const isAdminTabActive = () => document.getElementById('tab-admin')?.classList.contains('is-active');
+
+const openPlayersModalView = () => {
+  if (!playersModal) {
+    return;
+  }
+
+  playersModal.hidden = false;
+  playersModal.classList.remove('is-hidden');
+  playersModal.setAttribute('aria-hidden', 'false');
+};
+
+const closePlayersModalView = () => {
+  if (!playersModal) {
+    return;
+  }
+
+  playersModal.hidden = true;
+  playersModal.classList.add('is-hidden');
+  playersModal.setAttribute('aria-hidden', 'true');
+};
 
 const getMatchWinnerFromScore = (match, setsA, setsB, gamesA, gamesB) => {
   if (!match) {
@@ -279,6 +305,7 @@ const renderPairs = () => {
   const pairs = state.pairs;
   const players = state.players || [];
   const locked = isTournamentFinalized();
+  const unlocked = isAdminUnlocked() && isAdminTabActive();
   pairsCount.textContent = String(pairs.length);
   tournamentStatus.textContent = state.tournament.status;
 
@@ -295,11 +322,12 @@ const renderPairs = () => {
             <strong>${pair.name}</strong>
             <div class="pair-meta">${getPlayerDisplayName(players.find((player) => player.id === pair.playerOneId))} / ${getPlayerDisplayName(players.find((player) => player.id === pair.playerTwoId))}</div>
           </div>
-          <div class="pair-actions">
-            <button type="button" class="mini-action" data-action="edit" data-id="${pair.id}" ${locked ? 'disabled' : ''}>Editar</button>
-            <button type="button" class="mini-action is-danger" data-action="delete" data-id="${pair.id}" ${locked ? 'disabled' : ''}>Borrar</button>
-            <div class="pair-meta">#${index + 1}</div>
-          </div>
+          ${unlocked ? `
+            <div class="pair-actions">
+              <button type="button" class="mini-action" data-action="edit" data-id="${pair.id}" ${locked ? 'disabled' : ''}>Editar</button>
+              <button type="button" class="mini-action is-danger" data-action="delete" data-id="${pair.id}" ${locked ? 'disabled' : ''}>Borrar</button>
+            </div>
+          ` : ''}
         </article>
       `,
     )
@@ -870,7 +898,7 @@ const renderAll = () => {
   renderBracket();
   renderBracketResults();
   renderResults();
-  renderHistory();
+  renderHistoryDashboard();
   renderAdminState();
 };
 
@@ -1705,3 +1733,707 @@ document.addEventListener('keydown', (event) => {
 
 renderAll();
 setActiveTab('torneo');
+window.addEventListener('DOMContentLoaded', () => {
+  function syncPlayersModalVisibility(open) {
+    if (!playersModal) return;
+    playersModal.hidden = !open;
+    playersModal.classList.toggle('is-hidden', !open);
+    playersModal.setAttribute('aria-hidden', String(!open));
+  }
+
+  if (openPlayersModal) {
+    openPlayersModal.addEventListener('click', () => {
+      setActiveTab('admin');
+      syncPlayersModalVisibility(true);
+      renderPlayers();
+    });
+  }
+
+  if (closePlayersModal) {
+    closePlayersModal.addEventListener('click', () => {
+      syncPlayersModalVisibility(false);
+    });
+  }
+
+  if (openPairsTab) {
+    openPairsTab.addEventListener('click', () => {
+      setActiveTab('parejas');
+    });
+  }
+
+  document.addEventListener('click', (event) => {
+    const target = event.target;
+    if (target && target.matches && target.matches('[data-modal-close]')) {
+      syncPlayersModalVisibility(false);
+    }
+  });
+});
+
+function getPanelByTitle(title) {
+  const candidates = Array.from(document.querySelectorAll('details, section, article, .panel, .block-card'));
+  return candidates.find((element) => {
+    const heading = element.querySelector(':scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > summary');
+    return heading && heading.textContent.trim() === title;
+  });
+}
+
+function syncTournamentPanelsVisibility() {
+  const state = getState();
+  const tournament = state?.tournament ?? {};
+  const hasActiveTournament = tournament.status !== 'Sin torneo activo' && Boolean(tournament.name);
+  const showPodium = hasActiveTournament && tournament.status === 'Torneo archivado' && Boolean(tournament.closedAt);
+
+  document.body.classList.toggle('no-active-tournament', !hasActiveTournament);
+
+  const visibilityMap = new Map([
+    ['Grupos', hasActiveTournament],
+    ['Tabla general', hasActiveTournament],
+    ['Cuadro final', hasActiveTournament],
+    ['Resultados del cuadro', hasActiveTournament],
+    ['Fixture', hasActiveTournament],
+    ['Podio', showPodium],
+  ]);
+
+  visibilityMap.forEach((shouldShow, title) => {
+    const panel = getPanelByTitle(title);
+    if (!panel) return;
+    panel.hidden = !shouldShow;
+    panel.classList.toggle('is-hidden', !shouldShow);
+    panel.setAttribute('aria-hidden', String(!shouldShow));
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  syncTournamentPanelsVisibility();
+  const observer = new MutationObserver(() => syncTournamentPanelsVisibility());
+  observer.observe(document.body, { childList: true, subtree: true });
+  setInterval(syncTournamentPanelsVisibility, 1000);
+});
+
+const historyState = {
+  activeTab: 'tournaments',
+  selectedTournamentId: null,
+  selectedPlayerId: null,
+  selectedPairId: null,
+};
+
+function getHistoryPanels() {
+  return {
+    subTabs: Array.from(document.querySelectorAll('[data-history-tab]')),
+    tournamentsPanel: document.getElementById('historyList'),
+    playersPanel: document.getElementById('historyPlayersPanel'),
+    pairsPanel: document.getElementById('historyPairsPanel'),
+    placeFilter: document.getElementById('historyPlaceFilter'),
+    dateFilter: document.getElementById('historyDateFilter'),
+    participantFilter: document.getElementById('historyParticipantFilter'),
+    playerFilter: document.getElementById('historyPlayerFilter'),
+    pairFilter: document.getElementById('historyPairFilter'),
+  };
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function formatHistoryDate(value) {
+  if (!value) {
+    return 'Sin fecha';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+  return date.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function normalizeHistoryEntries() {
+  const state = getState();
+  const history = Array.isArray(state?.history) ? state.history : [];
+  return history
+    .map((entry, index) => {
+      const tournament = entry?.tournament ?? entry ?? {};
+      const pairs = Array.isArray(entry?.pairs) ? entry.pairs : [];
+      const matches = Array.isArray(entry?.matches) ? entry.matches : [];
+      const id = tournament.id ?? entry?.id ?? `${tournament.name ?? 'torneo'}-${index}`;
+      return {
+        id,
+        tournament,
+        pairs,
+        matches,
+        archivedAt: entry?.archivedAt ?? tournament.closedAt ?? tournament.createdAt ?? tournament.date ?? '',
+      };
+    })
+    .sort((left, right) => {
+      const leftDate = new Date(left.archivedAt || left.tournament?.date || 0).getTime();
+      const rightDate = new Date(right.archivedAt || right.tournament?.date || 0).getTime();
+      return rightDate - leftDate;
+    });
+}
+
+function getPairLabel(pair) {
+  const players = Array.isArray(pair?.players) ? pair.players : [];
+  const names = players.map((player) => getPlayerDisplayName(player)).filter(Boolean);
+  return names.length ? names.join(' / ') : pair?.name ?? 'Pareja sin nombre';
+}
+
+function getPairSearchBlob(pair) {
+  const players = Array.isArray(pair?.players) ? pair.players : [];
+  const blobs = [
+    pair?.name,
+    pair?.alias,
+    ...players.map((player) => [
+      player?.firstName,
+      player?.lastName,
+      player?.nickname,
+      player?.fullName,
+    ].filter(Boolean).join(' ')),
+  ];
+  return blobs.filter(Boolean).join(' ').toLowerCase();
+}
+
+function getPlayerStatSearchBlob(player) {
+  return [
+    player?.firstName,
+    player?.lastName,
+    player?.name,
+    player?.nickname,
+    player?.fullName,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
+function getTournamentSearchBlob(entry) {
+  const tournament = entry.tournament ?? {};
+  const pairBlob = (entry.pairs ?? []).map((pair) => getPairSearchBlob(pair)).join(' ');
+  return [
+    tournament.name,
+    tournament.place,
+    tournament.mode,
+    tournament.date,
+    tournament.status,
+    pairBlob,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
+function getTeamScore(match) {
+  const teamASets = Number(match?.teamASets ?? match?.setsA ?? match?.homeSets ?? match?.scoreA ?? 0);
+  const teamBSets = Number(match?.teamBSets ?? match?.setsB ?? match?.awaySets ?? match?.scoreB ?? 0);
+  const teamAGames = Number(match?.teamAGames ?? match?.gamesA ?? match?.homeGames ?? 0);
+  const teamBGames = Number(match?.teamBGames ?? match?.gamesB ?? match?.awayGames ?? 0);
+  return { teamASets, teamBSets, teamAGames, teamBGames };
+}
+
+function buildPairHistoryStats(entries) {
+  const statsByPair = new Map();
+
+  entries.forEach((entry) => {
+    const tournament = entry.tournament ?? {};
+    const winnerId = tournament.winnerId ?? entry.winnerId ?? null;
+    const pairs = Array.isArray(entry.pairs) ? entry.pairs : [];
+    const matches = Array.isArray(entry.matches) ? entry.matches : [];
+
+    pairs.forEach((pair) => {
+      const pairId = pair?.id;
+      if (!pairId) return;
+      if (!statsByPair.has(pairId)) {
+        statsByPair.set(pairId, {
+          pairId,
+          name: getPairLabel(pair),
+          tournamentsPlayed: 0,
+          tournamentsWon: 0,
+          setsFor: 0,
+          setsAgainst: 0,
+          gamesFor: 0,
+          gamesAgainst: 0,
+        });
+      }
+      statsByPair.get(pairId).tournamentsPlayed += 1;
+      if (winnerId && winnerId === pairId) {
+        statsByPair.get(pairId).tournamentsWon += 1;
+      }
+    });
+
+    matches.forEach((match) => {
+      const pairA = pairs.find((pair) => pair?.id === (match?.pairAId ?? match?.homePairId ?? match?.leftPairId));
+      const pairB = pairs.find((pair) => pair?.id === (match?.pairBId ?? match?.awayPairId ?? match?.rightPairId));
+      if (!pairA || !pairB) return;
+      const { teamASets, teamBSets, teamAGames, teamBGames } = getTeamScore(match);
+
+      const pairAStats = statsByPair.get(pairA.id);
+      const pairBStats = statsByPair.get(pairB.id);
+      if (pairAStats) {
+        pairAStats.setsFor += teamASets;
+        pairAStats.setsAgainst += teamBSets;
+        pairAStats.gamesFor += teamAGames;
+        pairAStats.gamesAgainst += teamBGames;
+      }
+      if (pairBStats) {
+        pairBStats.setsFor += teamBSets;
+        pairBStats.setsAgainst += teamASets;
+        pairBStats.gamesFor += teamBGames;
+        pairBStats.gamesAgainst += teamAGames;
+      }
+    });
+  });
+
+  return Array.from(statsByPair.values()).sort((left, right) => {
+    if (right.tournamentsWon !== left.tournamentsWon) return right.tournamentsWon - left.tournamentsWon;
+    const leftSetDiff = left.setsFor - left.setsAgainst;
+    const rightSetDiff = right.setsFor - right.setsAgainst;
+    if (rightSetDiff !== leftSetDiff) return rightSetDiff - leftSetDiff;
+    const leftGameDiff = left.gamesFor - left.gamesAgainst;
+    const rightGameDiff = right.gamesFor - right.gamesAgainst;
+    return rightGameDiff - leftGameDiff;
+  });
+}
+
+function buildPlayerHistoryStats(entries) {
+  const statsByPlayer = new Map();
+
+  entries.forEach((entry) => {
+    const tournament = entry.tournament ?? {};
+    const winnerId = tournament.winnerId ?? entry.winnerId ?? null;
+    const pairs = Array.isArray(entry.pairs) ? entry.pairs : [];
+    const matches = Array.isArray(entry.matches) ? entry.matches : [];
+
+    pairs.forEach((pair) => {
+      const players = Array.isArray(pair?.players) ? pair.players : [];
+      players.forEach((player) => {
+        if (!player?.id) return;
+        if (!statsByPlayer.has(player.id)) {
+          statsByPlayer.set(player.id, {
+            playerId: player.id,
+            name: getPlayerDisplayName(player),
+            tournamentsPlayed: 0,
+            tournamentsWon: 0,
+            setsFor: 0,
+            setsAgainst: 0,
+            gamesFor: 0,
+            gamesAgainst: 0,
+            partners: new Map(),
+          });
+        }
+        const stat = statsByPlayer.get(player.id);
+        stat.tournamentsPlayed += 1;
+        if (winnerId && pair?.id === winnerId) {
+          stat.tournamentsWon += 1;
+        }
+      });
+    });
+
+    matches.forEach((match) => {
+      const pairA = pairs.find((pair) => pair?.id === (match?.pairAId ?? match?.homePairId ?? match?.leftPairId));
+      const pairB = pairs.find((pair) => pair?.id === (match?.pairBId ?? match?.awayPairId ?? match?.rightPairId));
+      if (!pairA || !pairB) return;
+      const { teamASets, teamBSets, teamAGames, teamBGames } = getTeamScore(match);
+
+      const pairAPlayers = Array.isArray(pairA.players) ? pairA.players : [];
+      const pairBPlayers = Array.isArray(pairB.players) ? pairB.players : [];
+
+      pairAPlayers.forEach((playerA) => {
+        const stat = statsByPlayer.get(playerA.id);
+        if (!stat) return;
+        stat.setsFor += teamASets;
+        stat.setsAgainst += teamBSets;
+        stat.gamesFor += teamAGames;
+        stat.gamesAgainst += teamBGames;
+        pairBPlayers.forEach((partner) => {
+          const label = getPlayerDisplayName(partner);
+          const partnerStat = stat.partners.get(label) ?? {
+            name: label,
+            tournamentsWon: 0,
+            setsDiff: 0,
+            gamesDiff: 0,
+          };
+          if (winnerId && pairA.id === winnerId) {
+            partnerStat.tournamentsWon += 1;
+          }
+          partnerStat.setsDiff += teamASets - teamBSets;
+          partnerStat.gamesDiff += teamAGames - teamBGames;
+          stat.partners.set(label, partnerStat);
+        });
+      });
+
+      pairBPlayers.forEach((playerB) => {
+        const stat = statsByPlayer.get(playerB.id);
+        if (!stat) return;
+        stat.setsFor += teamBSets;
+        stat.setsAgainst += teamASets;
+        stat.gamesFor += teamBGames;
+        stat.gamesAgainst += teamAGames;
+        pairAPlayers.forEach((partner) => {
+          const label = getPlayerDisplayName(partner);
+          const partnerStat = stat.partners.get(label) ?? {
+            name: label,
+            tournamentsWon: 0,
+            setsDiff: 0,
+            gamesDiff: 0,
+          };
+          if (winnerId && pairB.id === winnerId) {
+            partnerStat.tournamentsWon += 1;
+          }
+          partnerStat.setsDiff += teamBSets - teamASets;
+          partnerStat.gamesDiff += teamBGames - teamAGames;
+          stat.partners.set(label, partnerStat);
+        });
+      });
+    });
+  });
+
+  return Array.from(statsByPlayer.values())
+    .map((stat) => ({
+      ...stat,
+      idealPairs: Array.from(stat.partners.values())
+        .sort((left, right) => {
+          if (right.tournamentsWon !== left.tournamentsWon) return right.tournamentsWon - left.tournamentsWon;
+          if (right.setsDiff !== left.setsDiff) return right.setsDiff - left.setsDiff;
+          return right.gamesDiff - left.gamesDiff;
+        })
+        .slice(0, 3),
+    }))
+    .sort((left, right) => {
+      if (right.tournamentsWon !== left.tournamentsWon) return right.tournamentsWon - left.tournamentsWon;
+      const leftSetDiff = left.setsFor - left.setsAgainst;
+      const rightSetDiff = right.setsFor - right.setsAgainst;
+      if (rightSetDiff !== leftSetDiff) return rightSetDiff - leftSetDiff;
+      const leftGameDiff = left.gamesFor - left.gamesAgainst;
+      const rightGameDiff = right.gamesFor - right.gamesAgainst;
+      return rightGameDiff - leftGameDiff;
+    });
+}
+
+function renderHistoryDashboard() {
+  const panels = getHistoryPanels();
+  if (!panels.tournamentsPanel || !panels.playersPanel || !panels.pairsPanel) {
+    return;
+  }
+
+  panels.subTabs.forEach((button) => {
+    button.classList.toggle('is-active', button.dataset.historyTab === historyState.activeTab);
+  });
+
+  const entries = normalizeHistoryEntries();
+  const placeQuery = (panels.placeFilter?.value ?? '').trim().toLowerCase();
+  const dateQuery = panels.dateFilter?.value ?? '';
+  const participantQuery = (panels.participantFilter?.value ?? '').trim().toLowerCase();
+
+  const filteredEntries = entries.filter((entry) => {
+    const tournament = entry.tournament ?? {};
+    const dateValue = (tournament.date ?? entry.archivedAt ?? '').slice(0, 10);
+    const placeMatch = !placeQuery || String(tournament.place ?? '').toLowerCase().includes(placeQuery);
+    const dateMatch = !dateQuery || dateValue === dateQuery;
+    const participantMatch = !participantQuery || getTournamentSearchBlob(entry).includes(participantQuery);
+    return placeMatch && dateMatch && participantMatch;
+  });
+
+  panels.tournamentsPanel.hidden = historyState.activeTab !== 'tournaments';
+  panels.tournamentsPanel.classList.toggle('is-hidden', historyState.activeTab !== 'tournaments');
+  panels.playersPanel.hidden = historyState.activeTab !== 'players';
+  panels.playersPanel.classList.toggle('is-hidden', historyState.activeTab !== 'players');
+  panels.pairsPanel.hidden = historyState.activeTab !== 'pairs';
+  panels.pairsPanel.classList.toggle('is-hidden', historyState.activeTab !== 'pairs');
+
+  if (historyState.activeTab === 'tournaments') {
+    const selectedEntry = filteredEntries.find((entry) => entry.id === historyState.selectedTournamentId) ?? filteredEntries[0] ?? null;
+    panels.tournamentsPanel.innerHTML = `
+      <div class="history-list">
+        ${filteredEntries.length ? filteredEntries.map((entry) => {
+          const tournament = entry.tournament ?? {};
+          const isSelected = selectedEntry?.id === entry.id;
+          const winners = Array.isArray(entry.pairs) ? entry.pairs.filter((pair) => pair?.id === tournament.winnerId).map((pair) => getPairLabel(pair)).join(' / ') : '';
+          return `
+            <button class="history-item ${isSelected ? 'is-selected' : ''}" type="button" data-history-open="${escapeHtml(entry.id)}">
+              <strong>${escapeHtml(tournament.name ?? 'Torneo sin nombre')}</strong>
+              <span>${escapeHtml(formatHistoryDate(tournament.date ?? entry.archivedAt))} · ${escapeHtml(tournament.place ?? 'Sin lugar')}</span>
+              <span>${escapeHtml(tournament.mode ?? 'Sin modo')} · ${escapeHtml(entry.pairs?.length ?? 0)} parejas</span>
+              <span>${escapeHtml(winners || 'Ganador no declarado')}</span>
+            </button>
+          `;
+        }).join('') : '<div class="empty-state">No hay torneos archivados.</div>'}
+      </div>
+      <div class="history-detail">
+        ${
+          selectedEntry
+            ? renderHistoryTournamentDetail(selectedEntry)
+            : '<div class="empty-state">Seleccioná un torneo para ver el detalle.</div>'
+        }
+      </div>
+    `;
+  }
+
+  if (historyState.activeTab === 'players') {
+    const playerStats = buildPlayerHistoryStats(entries);
+    const playerQuery = (panels.playerFilter?.value ?? '').trim().toLowerCase();
+    const filteredPlayers = playerStats.filter((player) => {
+      return !playerQuery || getPlayerStatSearchBlob(player).includes(playerQuery);
+    });
+    const selectedPlayer =
+      filteredPlayers.find((player) => player.playerId === historyState.selectedPlayerId) ??
+      filteredPlayers[0] ??
+      null;
+    panels.playersPanel.innerHTML = playerStats.length
+      ? `
+        <label class="history-search">
+          <span>Buscar jugador</span>
+          <input id="historyPlayerFilter" type="search" placeholder="Nombre, apellido o alias" value="${escapeHtml(playerQuery)}" />
+        </label>
+        <div class="history-grid">
+          ${filteredPlayers.map((player) => `
+            <button class="history-stat-card history-stat-button ${selectedPlayer?.playerId === player.playerId ? 'is-selected' : ''}" type="button" data-history-player-open="${escapeHtml(player.playerId)}">
+              <div class="history-stat-head">
+                <strong>${escapeHtml(player.name)}</strong>
+                <span>${player.tournamentsWon} torneos ganados</span>
+              </div>
+              <div class="history-stat-metrics">
+                <div><span>Torneos</span><strong>${player.tournamentsPlayed}</strong></div>
+                <div><span>Ganados</span><strong>${player.tournamentsWon}</strong></div>
+                <div><span>Sets</span><strong>${player.setsFor}-${player.setsAgainst}</strong></div>
+                <div><span>Games</span><strong>${player.gamesFor}-${player.gamesAgainst}</strong></div>
+              </div>
+              <div class="ideal-pairs">
+                <span>Parejas ideales</span>
+                <small>${player.idealPairs.length ? player.idealPairs.map((pair) => escapeHtml(pair.name)).join(' · ') : 'Sin datos suficientes'}</small>
+              </div>
+            </button>
+          `).join('')}
+        </div>
+        <div class="history-detail">
+          ${selectedPlayer ? renderHistoryPlayerDetail(selectedPlayer) : '<div class="empty-state">Seleccioná un jugador para ver el detalle.</div>'}
+        </div>
+      `
+      : '<div class="empty-state">No hay jugadores históricos todavía.</div>';
+  }
+
+  if (historyState.activeTab === 'pairs') {
+    const pairStats = buildPairHistoryStats(entries);
+    const pairQuery = (panels.pairFilter?.value ?? '').trim().toLowerCase();
+    const filteredPairs = pairStats.filter((pair) => {
+      return !pairQuery || getPairSearchBlob(pair).includes(pairQuery);
+    });
+    const selectedPair =
+      filteredPairs.find((pair) => pair.pairId === historyState.selectedPairId) ??
+      filteredPairs[0] ??
+      null;
+    panels.pairsPanel.innerHTML = pairStats.length
+      ? `
+        <label class="history-search">
+          <span>Buscar pareja</span>
+          <input id="historyPairFilter" type="search" placeholder="Nombre, apellido o alias" value="${escapeHtml(pairQuery)}" />
+        </label>
+        <div class="history-grid">
+          ${filteredPairs.map((pair) => `
+            <button class="history-stat-card history-stat-button ${selectedPair?.pairId === pair.pairId ? 'is-selected' : ''}" type="button" data-history-pair-open="${escapeHtml(pair.pairId)}">
+              <div class="history-stat-head">
+                <strong>${escapeHtml(pair.name)}</strong>
+                <span>${pair.tournamentsWon} torneos ganados</span>
+              </div>
+              <div class="history-stat-metrics">
+                <div><span>Torneos</span><strong>${pair.tournamentsPlayed}</strong></div>
+                <div><span>Ganados</span><strong>${pair.tournamentsWon}</strong></div>
+                <div><span>Sets</span><strong>${pair.setsFor}-${pair.setsAgainst}</strong></div>
+                <div><span>Games</span><strong>${pair.gamesFor}-${pair.gamesAgainst}</strong></div>
+              </div>
+            </button>
+          `).join('')}
+        </div>
+        <div class="history-detail">
+          ${selectedPair ? renderHistoryPairDetail(selectedPair) : '<div class="empty-state">Seleccioná una pareja para ver el detalle.</div>'}
+        </div>
+      `
+      : '<div class="empty-state">No hay parejas históricas todavía.</div>';
+  }
+
+}
+
+function renderHistoryTournamentDetail(entry) {
+  const tournament = entry.tournament ?? {};
+  const pairs = Array.isArray(entry.pairs) ? entry.pairs : [];
+  const matches = Array.isArray(entry.matches) ? entry.matches : [];
+  const winner = pairs.find((pair) => pair?.id === tournament.winnerId);
+  const pairRows = pairs.length
+    ? pairs.map((pair) => `
+      <div class="history-inline-row">
+        <strong>${escapeHtml(getPairLabel(pair))}</strong>
+        <span>${escapeHtml(pair.id === tournament.winnerId ? 'Campeón' : 'Participante')}</span>
+      </div>
+    `).join('')
+    : '<div class="empty-state">Sin parejas archivadas.</div>';
+
+  const matchRows = matches.length
+    ? matches.map((match) => {
+      const pairA = pairs.find((pair) => pair?.id === (match?.pairAId ?? match?.homePairId ?? match?.leftPairId));
+      const pairB = pairs.find((pair) => pair?.id === (match?.pairBId ?? match?.awayPairId ?? match?.rightPairId));
+      const { teamASets, teamBSets, teamAGames, teamBGames } = getTeamScore(match);
+      return `
+        <div class="history-match-row">
+          <strong>${escapeHtml(getPairLabel(pairA))}</strong>
+          <span>${teamASets}-${teamBSets} sets</span>
+          <span>${teamAGames}-${teamBGames} games</span>
+          <strong>${escapeHtml(getPairLabel(pairB))}</strong>
+        </div>
+      `;
+    }).join('')
+    : '<div class="empty-state">Sin partidos archivados.</div>';
+
+  return `
+    <article class="history-detail-card">
+      <div class="history-detail-head">
+        <div>
+          <p class="eyebrow">Detalle</p>
+          <h3>${escapeHtml(tournament.name ?? 'Torneo sin nombre')}</h3>
+          <p class="muted">${escapeHtml(formatHistoryDate(tournament.date ?? entry.archivedAt))} · ${escapeHtml(tournament.place ?? 'Sin lugar')} · ${escapeHtml(tournament.mode ?? 'Sin modo')}</p>
+        </div>
+      </div>
+      <div class="history-detail-grid">
+        <div><span>Estado</span><strong>${escapeHtml(tournament.status ?? 'Archivado')}</strong></div>
+        <div><span>Ganador</span><strong>${escapeHtml(winner ? getPairLabel(winner) : 'Sin ganador')}</strong></div>
+        <div><span>Parejas</span><strong>${pairs.length}</strong></div>
+        <div><span>Partidos</span><strong>${matches.length}</strong></div>
+        <div><span>Lugar</span><strong>${escapeHtml(tournament.place ?? 'Sin lugar')}</strong></div>
+        <div><span>Modo</span><strong>${escapeHtml(tournament.mode ?? 'Sin modo')}</strong></div>
+      </div>
+      <div class="history-section">
+        <div class="history-section-head">
+          <strong>Parejas</strong>
+          <span>${pairs.length}</span>
+        </div>
+        <div class="history-pairs-list">
+          ${pairRows}
+        </div>
+      </div>
+      <div class="history-section">
+        <div class="history-section-head">
+          <strong>Partidos</strong>
+          <span>${matches.length}</span>
+        </div>
+        <div class="history-matches-list">
+          ${matchRows}
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderHistoryPairDetail(pair) {
+  const pairedPlayers = Array.isArray(pair?.players) ? pair.players : [];
+  return `
+    <article class="history-detail-card">
+      <div class="history-detail-head">
+        <div>
+          <p class="eyebrow">Detalle de pareja</p>
+          <h3>${escapeHtml(pair.name)}</h3>
+          <p class="muted">${pairedPlayers.map((player) => escapeHtml(getPlayerDisplayName(player))).join(' · ')}</p>
+        </div>
+      </div>
+      <div class="history-detail-grid">
+        <div><span>Torneos jugados</span><strong>${pair.tournamentsPlayed}</strong></div>
+        <div><span>Torneos ganados</span><strong>${pair.tournamentsWon}</strong></div>
+        <div><span>Sets</span><strong>${pair.setsFor}-${pair.setsAgainst}</strong></div>
+        <div><span>Games</span><strong>${pair.gamesFor}-${pair.gamesAgainst}</strong></div>
+      </div>
+      <div class="history-section">
+        <div class="history-section-head">
+          <strong>Integrantes</strong>
+          <span>${pairedPlayers.length}</span>
+        </div>
+        <div class="history-pairs-list">
+          ${pairedPlayers.length ? pairedPlayers.map((player) => `
+            <div class="history-inline-row">
+              <strong>${escapeHtml(getPlayerDisplayName(player))}</strong>
+              <span>${escapeHtml(player.fullName ?? `${player.firstName ?? ''} ${player.lastName ?? ''}`.trim())}</span>
+            </div>
+          `).join('') : '<div class="empty-state">Sin integrantes registrados.</div>'}
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderHistoryPlayerDetail(player) {
+  const idealPairs = Array.isArray(player.idealPairs) ? player.idealPairs : [];
+  return `
+    <article class="history-detail-card">
+      <div class="history-detail-head">
+        <div>
+          <p class="eyebrow">Detalle de jugador</p>
+          <h3>${escapeHtml(player.name)}</h3>
+          <p class="muted">${escapeHtml(player.name)}</p>
+        </div>
+      </div>
+      <div class="history-detail-grid">
+        <div><span>Torneos jugados</span><strong>${player.tournamentsPlayed}</strong></div>
+        <div><span>Torneos ganados</span><strong>${player.tournamentsWon}</strong></div>
+        <div><span>Sets</span><strong>${player.setsFor}-${player.setsAgainst}</strong></div>
+        <div><span>Games</span><strong>${player.gamesFor}-${player.gamesAgainst}</strong></div>
+      </div>
+      <div class="history-section">
+        <div class="history-section-head">
+          <strong>Parejas ideales</strong>
+          <span>${idealPairs.length}</span>
+        </div>
+        <div class="history-pairs-list">
+          ${idealPairs.length ? idealPairs.map((pair) => `
+            <div class="history-inline-row">
+              <strong>${escapeHtml(pair.name)}</strong>
+              <span>${pair.tournamentsWon} éxitos</span>
+            </div>
+          `).join('') : '<div class="empty-state">Sin datos suficientes.</div>'}
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+document.addEventListener('click', (event) => {
+  const tabButton = event.target.closest?.('[data-history-tab]');
+  if (tabButton) {
+    historyState.activeTab = tabButton.dataset.historyTab || 'tournaments';
+    renderHistoryDashboard();
+    return;
+  }
+
+  const playerButton = event.target.closest?.('[data-history-player-open]');
+  if (playerButton) {
+    historyState.selectedPlayerId = playerButton.dataset.historyPlayerOpen;
+    renderHistoryDashboard();
+    return;
+  }
+
+  const pairButton = event.target.closest?.('[data-history-pair-open]');
+  if (pairButton) {
+    historyState.selectedPairId = pairButton.dataset.historyPairOpen;
+    renderHistoryDashboard();
+    return;
+  }
+
+  const tournamentButton = event.target.closest?.('[data-history-open]');
+  if (tournamentButton) {
+    historyState.selectedTournamentId = tournamentButton.dataset.historyOpen;
+    renderHistoryDashboard();
+  }
+});
+
+document.addEventListener('input', (event) => {
+  const target = event.target;
+  if (!target) return;
+  if (
+    target.id === 'historyPlaceFilter' ||
+    target.id === 'historyDateFilter' ||
+    target.id === 'historyParticipantFilter' ||
+    target.id === 'historyPlayerFilter' ||
+    target.id === 'historyPairFilter'
+  ) {
+    historyState.selectedTournamentId = null;
+    renderHistoryDashboard();
+  }
+});

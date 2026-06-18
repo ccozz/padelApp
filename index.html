@@ -177,7 +177,7 @@
               <h3>Sesión activa</h3>
               <p>El acceso queda guardado durante esta sesión del navegador.</p>
             </div>
-            <button type="button" class="secondary" id="adminLogout">Cerrar sesión</button>
+            <button type="button" class="secondary is-danger" id="adminLogout">Cerrar sesión</button>
           </div>
 
           <section class="card block-card">
@@ -243,7 +243,12 @@
               </label>
               <button type="submit" class="primary">Guardar jugador</button>
             </form>
-            <div id="playersList" class="stack-list"></div>
+            <div class="admin-actions admin-actions-single">
+              <button type="button" class="secondary" id="openPlayersModal">Ver jugadores</button>
+            </div>
+            <div class="admin-actions admin-actions-single">
+              <button type="button" class="secondary" id="openPairsTab">Ver parejas anotadas</button>
+            </div>
           </section>
 
           <div class="admin-actions">
@@ -274,7 +279,7 @@
           <section class="placeholder">
             <h3>Motor del torneo</h3>
             <p>
-              Acá va la lógica de armado de grupos, cruces, tabla general, promedios y cuadro final.
+              Acá va la lógica de armado de grupos, cruces, tabla general y avance de fases hasta definir el ganador.
             </p>
           </section>
 
@@ -307,11 +312,56 @@
 
           <section class="card block-card">
             <span class="card-label">Torneos guardados</span>
-            <div id="historyList" class="stack-list"></div>
+      <div class="subtabs" role="tablist" aria-label="Historial">
+        <button class="subtab is-active" type="button" data-history-tab="tournaments">Torneos</button>
+        <button class="subtab" type="button" data-history-tab="pairs">Parejas</button>
+        <button class="subtab" type="button" data-history-tab="players">Jugadores</button>
+      </div>
+      <div class="history-filters history-panel" id="historyTournamentFilters">
+        <label>
+          <span>Filtro por lugar</span>
+          <input id="historyPlaceFilter" type="search" placeholder="Buscar lugar" />
+        </label>
+        <label>
+          <span>Filtro por fecha</span>
+          <input id="historyDateFilter" type="date" />
+        </label>
+        <label>
+          <span>Filtro por participante</span>
+          <input id="historyParticipantFilter" type="search" placeholder="Buscar jugador o pareja" />
+        </label>
+      </div>
+      <div id="historyList" class="history-panel"></div>
+      <div id="historyPlayersPanel" class="history-panel is-hidden" hidden>
+        <label class="history-search">
+          <span>Buscar jugador</span>
+          <input id="historyPlayerFilter" type="search" placeholder="Nombre, apellido o alias" />
+        </label>
+      </div>
+      <div id="historyPairsPanel" class="history-panel is-hidden" hidden>
+        <label class="history-search">
+          <span>Buscar pareja</span>
+          <input id="historyPairFilter" type="search" placeholder="Nombre, apellido o alias" />
+        </label>
+      </div>
           </section>
         </section>
       </main>
     </div>
+
+    <section class="modal-shell is-hidden" id="playersModal" hidden aria-hidden="true">
+      <div class="modal-backdrop" data-modal-close></div>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="playersModalTitle">
+        <div class="modal-head">
+          <div>
+            <span class="card-label">Jugadores</span>
+            <h3 id="playersModalTitle">Registro maestro</h3>
+          </div>
+          <button type="button" class="secondary is-danger" id="closePlayersModal">Cerrar</button>
+        </div>
+        <div id="playersList" class="stack-list players-grid"></div>
+      </div>
+    </section>
 
     <script type="module" src="./src/main.js"></script>
   </body>
