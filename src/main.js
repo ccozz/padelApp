@@ -1817,6 +1817,26 @@ const historyState = {
   selectedPairId: null,
 };
 
+window.selectHistoryTab = function selectHistoryTab(tab) {
+  historyState.activeTab = tab || 'tournaments';
+  renderHistoryDashboard();
+};
+
+window.openHistoryTournament = function openHistoryTournament(id) {
+  historyState.selectedTournamentId = id;
+  renderHistoryDashboard();
+};
+
+window.openHistoryPlayer = function openHistoryPlayer(id) {
+  historyState.selectedPlayerId = id;
+  renderHistoryDashboard();
+};
+
+window.openHistoryPair = function openHistoryPair(id) {
+  historyState.selectedPairId = id;
+  renderHistoryDashboard();
+};
+
 function getHistoryPanels() {
   return {
     subTabs: Array.from(document.querySelectorAll('[data-history-tab]')),
@@ -1824,7 +1844,6 @@ function getHistoryPanels() {
     playersPanel: document.getElementById('historyPlayersPanel'),
     pairsPanel: document.getElementById('historyPairsPanel'),
     placeFilter: document.getElementById('historyPlaceFilter'),
-    dateFilter: document.getElementById('historyDateFilter'),
     participantFilter: document.getElementById('historyParticipantFilter'),
     playerFilter: document.getElementById('historyPlayerFilter'),
     pairFilter: document.getElementById('historyPairFilter'),
@@ -2152,7 +2171,7 @@ function renderHistoryDashboard() {
           const isSelected = selectedEntry?.id === entry.id;
           const winners = Array.isArray(entry.pairs) ? entry.pairs.filter((pair) => pair?.id === tournament.winnerId).map((pair) => getPairLabel(pair)).join(' / ') : '';
           return `
-            <button class="history-item ${isSelected ? 'is-selected' : ''}" type="button" data-history-open="${escapeHtml(entry.id)}">
+            <button class="history-item ${isSelected ? 'is-selected' : ''}" type="button" onclick="openHistoryTournament('${escapeHtml(entry.id)}')">
               <strong>${escapeHtml(tournament.name ?? 'Torneo sin nombre')}</strong>
               <span>${escapeHtml(formatHistoryDate(tournament.date ?? entry.archivedAt))} · ${escapeHtml(tournament.place ?? 'Sin lugar')}</span>
               <span>${escapeHtml(tournament.mode ?? 'Sin modo')} · ${escapeHtml(entry.pairs?.length ?? 0)} parejas</span>
@@ -2189,7 +2208,7 @@ function renderHistoryDashboard() {
         </label>
         <div class="history-grid">
           ${filteredPlayers.map((player) => `
-            <button class="history-stat-card history-stat-button ${selectedPlayer?.playerId === player.playerId ? 'is-selected' : ''}" type="button" data-history-player-open="${escapeHtml(player.playerId)}">
+            <button class="history-stat-card history-stat-button ${selectedPlayer?.playerId === player.playerId ? 'is-selected' : ''}" type="button" onclick="openHistoryPlayer('${escapeHtml(player.playerId)}')">
               <div class="history-stat-head">
                 <strong>${escapeHtml(player.name)}</strong>
                 <span>${player.tournamentsWon} torneos ganados</span>
@@ -2232,7 +2251,7 @@ function renderHistoryDashboard() {
         </label>
         <div class="history-grid">
           ${filteredPairs.map((pair) => `
-            <button class="history-stat-card history-stat-button ${selectedPair?.pairId === pair.pairId ? 'is-selected' : ''}" type="button" data-history-pair-open="${escapeHtml(pair.pairId)}">
+            <button class="history-stat-card history-stat-button ${selectedPair?.pairId === pair.pairId ? 'is-selected' : ''}" type="button" onclick="openHistoryPair('${escapeHtml(pair.pairId)}')">
               <div class="history-stat-head">
                 <strong>${escapeHtml(pair.name)}</strong>
                 <span>${pair.tournamentsWon} torneos ganados</span>
@@ -2395,28 +2414,31 @@ function renderHistoryPlayerDetail(player) {
 }
 
 document.addEventListener('click', (event) => {
-  const tabButton = event.target.closest?.('[data-history-tab]');
+  const target = event.target instanceof Element ? event.target : null;
+  if (!target) return;
+
+  const tabButton = target.closest('[data-history-tab]');
   if (tabButton) {
     historyState.activeTab = tabButton.dataset.historyTab || 'tournaments';
     renderHistoryDashboard();
     return;
   }
 
-  const playerButton = event.target.closest?.('[data-history-player-open]');
+  const playerButton = target.closest('[data-history-player-open]');
   if (playerButton) {
     historyState.selectedPlayerId = playerButton.dataset.historyPlayerOpen;
     renderHistoryDashboard();
     return;
   }
 
-  const pairButton = event.target.closest?.('[data-history-pair-open]');
+  const pairButton = target.closest('[data-history-pair-open]');
   if (pairButton) {
     historyState.selectedPairId = pairButton.dataset.historyPairOpen;
     renderHistoryDashboard();
     return;
   }
 
-  const tournamentButton = event.target.closest?.('[data-history-open]');
+  const tournamentButton = target.closest('[data-history-open]');
   if (tournamentButton) {
     historyState.selectedTournamentId = tournamentButton.dataset.historyOpen;
     renderHistoryDashboard();

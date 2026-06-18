@@ -313,18 +313,14 @@
           <section class="card block-card">
             <span class="card-label">Torneos guardados</span>
       <div class="subtabs" role="tablist" aria-label="Historial">
-        <button class="subtab is-active" type="button" data-history-tab="tournaments">Torneos</button>
-        <button class="subtab" type="button" data-history-tab="pairs">Parejas</button>
-        <button class="subtab" type="button" data-history-tab="players">Jugadores</button>
+        <button class="subtab is-active" type="button" onclick="selectHistoryTab('tournaments')">Torneos</button>
+        <button class="subtab" type="button" onclick="selectHistoryTab('pairs')">Parejas</button>
+        <button class="subtab" type="button" onclick="selectHistoryTab('players')">Jugadores</button>
       </div>
       <div class="history-filters history-panel" id="historyTournamentFilters">
         <label>
           <span>Filtro por lugar</span>
           <input id="historyPlaceFilter" type="search" placeholder="Buscar lugar" />
-        </label>
-        <label>
-          <span>Filtro por fecha</span>
-          <input id="historyDateFilter" type="date" />
         </label>
         <label>
           <span>Filtro por participante</span>

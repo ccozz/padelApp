@@ -1129,11 +1129,16 @@ select option {
 .history-stat-button {
   text-align: left;
   width: 100%;
+  cursor: pointer;
 }
 
 .history-stat-button.is-selected {
   border-color: rgba(96, 165, 250, 0.55);
   box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.14);
+}
+
+.history-stat-button:hover {
+  transform: translateY(-1px);
 }
 
 .history-stat-head {
