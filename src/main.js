@@ -96,6 +96,32 @@ const getPlayerMap = (players) => new Map(players.map((player) => [player.id, pl
 const getPlayerName = (players, playerIdValue, fallback = '') =>
   players.find((player) => player.id === playerIdValue)?.fullName || fallback || '';
 
+const getPlayerDisplayName = (player) => {
+  if (!player) {
+    return '';
+  }
+
+  if (player.nickname) {
+    return `${player.nickname} (${[player.firstName, player.lastName].filter(Boolean).join(' ').trim()})`;
+  }
+
+  return [player.firstName, player.lastName].filter(Boolean).join(' ').trim() || player.fullName || '';
+};
+
+const getPlayerGroupLabel = (player) => {
+  if (!player) {
+    return '';
+  }
+
+  return player.nickname || [player.firstName, player.lastName].filter(Boolean).join(' ').trim() || player.fullName || '';
+};
+
+const getPlayerSearchBlob = (player) =>
+  [player?.firstName, player?.lastName, player?.nickname, player?.fullName]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
 const formatTournamentMode = (mode) => {
   if (mode === 'clasico') {
     return 'Clásico';
@@ -204,7 +230,7 @@ const renderPlayerOptions = () => {
   const options =
     '<option value="">Seleccionar jugador</option>' +
     players
-      .map((player) => `<option value="${player.id}">${player.fullName}</option>`)
+      .map((player) => `<option value="${player.id}">${getPlayerDisplayName(player)}</option>`)
       .join('');
 
   if (playerOneSelect) {
@@ -235,8 +261,8 @@ const renderPlayers = () => {
       (player) => `
         <article class="pair-item">
           <div>
-            <strong>${player.fullName}</strong>
-            <div class="pair-meta">ID: ${player.id}</div>
+            <strong>${getPlayerDisplayName(player)}</strong>
+            <div class="pair-meta">${player.firstName} ${player.lastName}</div>
           </div>
           <div class="pair-actions">
             <button type="button" class="mini-action" data-player-action="edit" data-player-id="${player.id}">Editar</button>
@@ -252,7 +278,6 @@ const renderPairs = () => {
   const state = getState();
   const pairs = state.pairs;
   const players = state.players || [];
-  const playerMap = getPlayerMap(players);
   const locked = isTournamentFinalized();
   pairsCount.textContent = String(pairs.length);
   tournamentStatus.textContent = state.tournament.status;
@@ -268,8 +293,7 @@ const renderPairs = () => {
         <article class="pair-item">
           <div>
             <strong>${pair.name}</strong>
-            <div class="pair-meta">${getPlayerName(players, pair.playerOneId, pair.playerOne)} / ${getPlayerName(players, pair.playerTwoId, pair.playerTwo)}</div>
-            <div class="pair-meta">ID: ${pair.id}</div>
+            <div class="pair-meta">${getPlayerDisplayName(players.find((player) => player.id === pair.playerOneId))} / ${getPlayerDisplayName(players.find((player) => player.id === pair.playerTwoId))}</div>
           </div>
           <div class="pair-actions">
             <button type="button" class="mini-action" data-action="edit" data-id="${pair.id}" ${locked ? 'disabled' : ''}>Editar</button>
@@ -356,6 +380,8 @@ const renderGroups = () => {
           return {
             id: pairIdValue,
             name: pair?.name || pairIdValue,
+            playerOneLabel: getPlayerGroupLabel(players.find((player) => player.id === pair.playerOneId)),
+            playerTwoLabel: getPlayerGroupLabel(players.find((player) => player.id === pair.playerTwoId)),
             wins: row.wins || 0,
             losses: row.losses || 0,
             setsDiff: (row.setsFor || 0) - (row.setsAgainst || 0),
@@ -367,6 +393,7 @@ const renderGroups = () => {
       return `
         <article class="group-block">
           <div class="group-title">${group.name}</div>
+          <div class="group-meta">${row.playerOneLabel} / ${row.playerTwoLabel}</div>
           <div class="group-table-wrap">
             <table class="group-table">
               <colgroup>
@@ -410,28 +437,107 @@ const renderGroups = () => {
 
 const renderMatches = () => {
   const state = getState();
+  const statusFilter = fixtureStatusFilter?.value || 'all';
+  const playerFilter = normalizeText(fixturePlayerFilter?.value || '').toLowerCase();
+  const players = state.players || [];
 
   if (state.matches.length === 0) {
     matchesList.innerHTML = '<div class="placeholder">Todavia no hay partidos generados.</div>';
     return;
   }
 
-  matchesList.innerHTML = state.matches
-    .map(
-      (match, index) => `
-        <article class="match-block">
-          <div class="match-title">Partido ${index + 1}</div>
-          <div class="match-meta">${match.pairALabel} vs ${match.pairBLabel}</div>
-          <div class="match-meta">
-            Estado: ${match.played ? 'Jugado' : 'Pendiente'}
-            ${match.played ? ` · Score ${match.setsA}-${match.setsB} / ${match.gamesA}-${match.gamesB}` : ''}
-          </div>
-          <div class="match-meta">
-            ${match.date || match.time || match.venue ? `${match.date || 'Sin fecha'} · ${match.time || 'Sin hora'} · ${match.venue || 'Sin lugar'}` : 'Sin agenda asignada'}
+  const filteredMatches = state.matches.filter((match) => {
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'past' && match.played) ||
+      (statusFilter === 'future' && !match.played);
+
+    if (!matchesStatus) {
+      return false;
+    }
+
+    if (!playerFilter) {
+      return true;
+    }
+
+    const pairA = players.find((player) => player.id === match.pairAId);
+    const pairB = players.find((player) => player.id === match.pairBId);
+    const searchBlob = [
+      match.pairALabel,
+      match.pairBLabel,
+      pairA?.firstName,
+      pairA?.lastName,
+      pairA?.nickname,
+      pairA?.fullName,
+      pairB?.firstName,
+      pairB?.lastName,
+      pairB?.nickname,
+      pairB?.fullName,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    return searchBlob.includes(playerFilter);
+  });
+
+  if (filteredMatches.length === 0) {
+    matchesList.innerHTML = '<div class="placeholder">No hay partidos para ese filtro.</div>';
+    return;
+  }
+
+  const matchesByDay = filteredMatches.reduce((accumulator, match) => {
+    const dayKey = match.date || 'Sin fecha';
+    if (!accumulator.has(dayKey)) {
+      accumulator.set(dayKey, []);
+    }
+    accumulator.get(dayKey).push(match);
+    return accumulator;
+  }, new Map());
+
+  const orderedDays = [...matchesByDay.keys()].sort((left, right) => {
+    if (left === 'Sin fecha') return 1;
+    if (right === 'Sin fecha') return -1;
+    return left.localeCompare(right);
+  });
+
+  matchesList.innerHTML = orderedDays
+    .map((dayKey) => {
+      const dayMatches = matchesByDay
+        .get(dayKey)
+        .slice()
+        .sort((left, right) => (left.time || '').localeCompare(right.time || '') || left.pairALabel.localeCompare(right.pairALabel, 'es'));
+
+      const title =
+        dayKey === 'Sin fecha'
+          ? 'Sin fecha asignada'
+          : new Date(`${dayKey}T00:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+
+      return `
+        <article class="match-day">
+          <div class="match-day-head">${title}</div>
+          <div class="stack-list">
+            ${dayMatches
+              .map(
+                (match, index) => `
+                  <article class="match-block">
+                    <div class="match-title">Partido ${index + 1}</div>
+                    <div class="match-meta">${match.pairALabel} vs ${match.pairBLabel}</div>
+                    <div class="match-meta">
+                      Estado: ${match.played ? 'Jugado' : 'Pendiente'}
+                      ${match.played ? ` · Score ${match.setsA}-${match.setsB} / ${match.gamesA}-${match.gamesB}` : ''}
+                    </div>
+                    <div class="match-meta">
+                      ${match.time || match.venue ? `${match.time || 'Sin hora'} · ${match.venue || 'Sin lugar'}` : 'Sin agenda asignada'}
+                    </div>
+                  </article>
+                `,
+              )
+              .join('')}
           </div>
         </article>
-      `,
-    )
+      `;
+    })
     .join('');
 };
 
@@ -871,7 +977,9 @@ const startEditPlayer = (id) => {
   }
 
   playerId.value = player.id;
-  playerFullName.value = player.fullName;
+  playerFirstName.value = player.firstName || '';
+  playerLastName.value = player.lastName || '';
+  playerAlias.value = player.nickname || '';
   setActiveTab('admin');
 };
 
@@ -1102,15 +1210,20 @@ playerForm.addEventListener('submit', (event) => {
   }
 
   const state = getState();
-  const fullName = normalizeText(playerFullName.value);
+  const firstName = normalizeText(playerFirstName.value);
+  const lastName = normalizeText(playerLastName.value);
+  const alias = normalizeText(playerAlias.value || '');
   const editingId = playerId.value.trim();
 
-  if (!fullName) {
+  if (!firstName || !lastName) {
     return;
   }
 
   const duplicatePlayer = state.players.find(
-    (player) => normalizeText(player.fullName).toLowerCase() === fullName.toLowerCase() && player.id !== editingId,
+    (player) =>
+      normalizeText(player.firstName).toLowerCase() === firstName.toLowerCase() &&
+      normalizeText(player.lastName).toLowerCase() === lastName.toLowerCase() &&
+      player.id !== editingId,
   );
 
   if (duplicatePlayer) {
@@ -1120,7 +1233,10 @@ playerForm.addEventListener('submit', (event) => {
 
   const nextPlayer = {
     id: editingId || createId(),
-    fullName,
+    firstName,
+    lastName,
+    nickname: alias,
+    fullName: [firstName, lastName].join(' ').trim(),
     createdAt: editingId ? state.players.find((player) => player.id === editingId)?.createdAt || new Date().toISOString() : new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -1416,6 +1532,9 @@ loadSamplePairs.addEventListener('click', () => {
 
     const newPlayer = {
       id: createId(),
+      firstName: cleanName.split(' ')[0] || cleanName,
+      lastName: cleanName.split(' ').slice(1).join(' '),
+      nickname: '',
       fullName: cleanName,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -1435,8 +1554,8 @@ loadSamplePairs.addEventListener('click', () => {
       name,
       playerOneId: firstPlayer.id,
       playerTwoId: secondPlayer.id,
-      playerOne: firstPlayer.fullName,
-      playerTwo: secondPlayer.fullName,
+      playerOne: getPlayerDisplayName(firstPlayer) || firstPlayer.fullName,
+      playerTwo: getPlayerDisplayName(secondPlayer) || secondPlayer.fullName,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -1544,6 +1663,8 @@ archiveTournament.addEventListener('click', () => {
 
 historyDateFilter.addEventListener('input', renderAll);
 historyPlayerFilter.addEventListener('input', renderAll);
+fixtureStatusFilter.addEventListener('change', renderAll);
+fixturePlayerFilter.addEventListener('input', renderAll);
 tournamentWinner.addEventListener('change', () => {
   if (!canEditTournament()) {
     return;

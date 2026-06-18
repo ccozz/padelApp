@@ -43,28 +43,30 @@
             <h2>Información del torneo</h2>
             <p>Resumen público de la competencia.</p>
           </div>
-          <div class="grid cards">
-            <article class="card" id="tournamentInfoCard">
-              <span class="card-label">Torneo actual</span>
+          <details class="card tournament-details">
+            <summary>
+              <span class="card-label">Información del torneo</span>
               <strong id="tournamentInfoTitle">Sin torneo activo</strong>
               <p id="tournamentInfoMeta">Creá un torneo desde el panel de admin.</p>
-            </article>
-            <article class="card">
-              <span class="card-label">Formato</span>
-              <strong>Grupos + eliminación</strong>
-              <p>Fase inicial normalizada y cuadro final automático.</p>
-            </article>
-            <article class="card">
-              <span class="card-label">Puntaje</span>
-              <strong>Victoria 1 / Derrota 0</strong>
-              <p>Regla base definida para esta versión.</p>
-            </article>
-            <article class="card">
-              <span class="card-label">Desempate</span>
-              <strong>Directo, sets, games</strong>
-              <p>Orden de desempate por enfrentamiento y métricas deportivas.</p>
-            </article>
-          </div>
+            </summary>
+            <div class="grid cards tournament-details-grid">
+              <article class="card">
+                <span class="card-label">Formato</span>
+                <strong>Grupos + eliminación</strong>
+                <p>Fase inicial normalizada y cuadro final automático.</p>
+              </article>
+              <article class="card">
+                <span class="card-label">Puntaje</span>
+                <strong>Victoria 1 / Derrota 0</strong>
+                <p>Regla base definida para esta versión.</p>
+              </article>
+              <article class="card">
+                <span class="card-label">Desempate</span>
+                <strong>Directo, sets, games</strong>
+                <p>Orden de desempate por enfrentamiento y métricas deportivas.</p>
+              </article>
+            </div>
+          </details>
 
           <section class="card block-card">
             <span class="card-label">Grupos</span>
@@ -227,11 +229,12 @@
             <h3>Registro maestro</h3>
             <form class="admin-form" id="playerForm">
               <input id="playerId" type="hidden" />
-            <label>
-              Nombre y apellido
+              <div class="player-form-note">La comparación de duplicados se hace por nombre + apellido.</div>
+              <label>
+                Nombre y apellido
                 <div class="player-name-grid">
-                  <input id="playerFirstName" type="text" placeholder="Nombre" required />
-                  <input id="playerLastName" type="text" placeholder="Apellido" required />
+                  <input id="playerFirstName" type="text" placeholder="Nombre" autocomplete="given-name" required />
+                  <input id="playerLastName" type="text" placeholder="Apellido" autocomplete="family-name" required />
                 </div>
               </label>
               <label>
