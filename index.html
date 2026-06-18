@@ -110,7 +110,7 @@
         <section class="panel" id="tab-fixture">
           <div class="section-head">
             <h2>Fixture</h2>
-            <p>Partidos del torneo activo con filtros por estado y jugador.</p>
+            <p>Partidos del torneo activo agrupados por día, con filtros por estado y jugador.</p>
           </div>
 
           <section class="card block-card">
@@ -298,35 +298,7 @@
           </div>
 
           <section class="card block-card">
-            <span class="card-label">Torneos guardados</span>
-      <div class="subtabs" role="tablist" aria-label="Historial">
-        <button class="subtab is-active" type="button" onclick="selectHistoryTab('tournaments')">Torneos</button>
-        <button class="subtab" type="button" onclick="selectHistoryTab('pairs')">Parejas</button>
-        <button class="subtab" type="button" onclick="selectHistoryTab('players')">Jugadores</button>
-      </div>
-      <div class="history-filters history-panel" id="historyTournamentFilters">
-        <label>
-          <span>Filtro por lugar</span>
-          <input id="historyPlaceFilter" type="search" placeholder="Buscar lugar" />
-        </label>
-        <label>
-          <span>Filtro por participante</span>
-          <input id="historyParticipantFilter" type="search" placeholder="Buscar jugador o pareja" />
-        </label>
-      </div>
-      <div id="historyList" class="history-panel"></div>
-      <div id="historyPlayersPanel" class="history-panel is-hidden" hidden>
-        <label class="history-search">
-          <span>Buscar jugador</span>
-          <input id="historyPlayerFilter" type="search" placeholder="Nombre, apellido o alias" />
-        </label>
-      </div>
-      <div id="historyPairsPanel" class="history-panel is-hidden" hidden>
-        <label class="history-search">
-          <span>Buscar pareja</span>
-          <input id="historyPairFilter" type="search" placeholder="Nombre, apellido o alias" />
-        </label>
-      </div>
+            <div id="historyRoot" class="history-root"></div>
           </section>
         </section>
       </main>

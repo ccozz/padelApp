@@ -29,12 +29,13 @@ const isTournamentFinalized = () => {
   return Boolean(currentState.tournament.closedAt) || currentState.tournament.status === 'Torneo archivado';
 };
 
+const getFinalWinnerId = (state) => state?.bracketChampion?.winnerId || state?.tournament?.winnerId || null;
+
 const canArchiveTournament = () => {
   const currentState = getState();
-  return Boolean(currentState.bracketChampion?.winnerId) && !isTournamentFinalized();
+  return Boolean(getFinalWinnerId(currentState)) && !isTournamentFinalized();
 };
 const resultsList = document.getElementById('resultsList');
-const historyList = document.getElementById('historyList');
 const fixtureStatusFilter = document.getElementById('fixtureStatusFilter');
 const fixturePlayerFilter = document.getElementById('fixturePlayerFilter');
 const tournamentWinner = document.getElementById('tournamentWinner');
@@ -556,6 +557,23 @@ const renderMatches = () => {
                     <div class="match-meta">
                       ${match.time || match.venue ? `${match.time || 'Sin hora'} · ${match.venue || 'Sin lugar'}` : 'Sin agenda asignada'}
                     </div>
+                    ${canEditTournament() ? `
+                      <form class="match-agenda-form" data-agenda-match-id="${match.id}">
+                        <label>
+                          Día
+                          <input name="date" type="date" value="${match.date || ''}" />
+                        </label>
+                        <label>
+                          Hora
+                          <input name="time" type="time" value="${match.time || ''}" />
+                        </label>
+                        <label>
+                          Lugar
+                          <input name="venue" type="text" value="${match.venue || ''}" placeholder="Sede o cancha" />
+                        </label>
+                        <button type="submit" class="secondary">Guardar agenda</button>
+                      </form>
+                    ` : ''}
                   </article>
                 `,
               )
@@ -673,8 +691,9 @@ const renderBracket = () => {
     return;
   }
 
-  const champion = isTournamentFinalized() && state.tournament.winnerId
-    ? state.pairs.find((pair) => pair.id === state.tournament.winnerId)?.name || 'Ganador'
+  const championId = getFinalWinnerId(state);
+  const champion = isTournamentFinalized() && championId
+    ? state.pairs.find((pair) => pair.id === championId)?.name || 'Ganador'
     : resolvedBracket.champion?.winnerName || 'Pendiente';
 
   bracketList.innerHTML = resolvedBracket.played
@@ -1052,6 +1071,15 @@ const updateMatch = (matchId, updater) => {
   });
 };
 
+const updateMatchAgenda = (matchId, agenda) => {
+  updateMatch(matchId, (match) => ({
+    ...match,
+    date: agenda.date,
+    time: agenda.time,
+    venue: agenda.venue,
+  }));
+};
+
 const parseNumber = (value) => {
   if (value === '' || value === null || value === undefined) {
     return null;
@@ -1413,6 +1441,32 @@ resultsList.addEventListener('submit', (event) => {
   }));
 });
 
+matchesList.addEventListener('submit', (event) => {
+  if (!canEditTournament()) {
+    return;
+  }
+
+  const form = event.target.closest('form[data-agenda-match-id]');
+  if (!form || event.target !== form) {
+    return;
+  }
+
+  event.preventDefault();
+
+  const state = getState();
+  if (!hasActiveTournament(state)) {
+    return;
+  }
+
+  const matchId = form.dataset.agendaMatchId;
+  const formData = new FormData(form);
+  updateMatchAgenda(matchId, {
+    date: normalizeText(formData.get('date') || ''),
+    time: normalizeText(formData.get('time') || ''),
+    venue: normalizeText(formData.get('venue') || ''),
+  });
+});
+
 bracketResultsList.addEventListener('change', (event) => {
   if (!canEditTournament()) {
     return;
@@ -1441,14 +1495,15 @@ bracketResultsList.addEventListener('change', (event) => {
     bracketResults: nextBracketResults,
   };
   const nextDerived = rebuildDerivedState(nextState);
+  const finalWinnerId = getFinalWinnerId(nextDerived);
 
   setState({
     ...nextDerived,
     tournament: {
       ...nextDerived.tournament,
-      winnerId: nextDerived.bracketChampion?.winnerId || nextDerived.tournament.winnerId || null,
-      closedAt: nextDerived.bracketChampion?.winnerId ? nextDerived.tournament.closedAt : null,
-      status: nextDerived.bracketChampion?.winnerId ? 'Campeón definido' : 'Resultados del cuadro actualizados',
+      winnerId: finalWinnerId,
+      closedAt: finalWinnerId ? nextDerived.tournament.closedAt : null,
+      status: finalWinnerId ? 'Campeón definido' : 'Resultados del cuadro actualizados',
     },
   });
 });
@@ -1604,7 +1659,7 @@ archiveTournament.addEventListener('click', () => {
   }
 
   const state = getState();
-  const winnerId = state.bracketChampion?.winnerId || null;
+  const winnerId = getFinalWinnerId(state);
 
   if (!winnerId) {
     alert('Primero resolvé el cuadro completo para definir al campeón.');
@@ -1759,6 +1814,10 @@ const historyState = {
   selectedTournamentId: null,
   selectedPlayerId: null,
   selectedPairId: null,
+  tournamentPlaceQuery: '',
+  tournamentParticipantQuery: '',
+  playerQuery: '',
+  pairQuery: '',
 };
 
 window.selectHistoryTab = function selectHistoryTab(tab) {
@@ -1766,33 +1825,42 @@ window.selectHistoryTab = function selectHistoryTab(tab) {
   renderHistoryDashboard();
 };
 
+window.openHistoryTab = function openHistoryTab(tab) {
+  historyState.activeTab = tab || 'tournaments';
+  historyState.selectedTournamentId = null;
+  historyState.selectedPlayerId = null;
+  historyState.selectedPairId = null;
+  renderHistoryDashboard();
+};
+
+window.setHistoryQuery = function setHistoryQuery(scope, value) {
+  const text = String(value ?? '');
+  if (scope === 'tournamentPlaceQuery') {
+    historyState.tournamentPlaceQuery = text;
+  } else if (scope === 'tournamentParticipantQuery') {
+    historyState.tournamentParticipantQuery = text;
+  } else if (scope === 'playerQuery') {
+    historyState.playerQuery = text;
+  } else if (scope === 'pairQuery') {
+    historyState.pairQuery = text;
+  }
+  renderHistoryDashboard();
+};
+
 window.openHistoryTournament = function openHistoryTournament(id) {
-  historyState.selectedTournamentId = id;
+  historyState.selectedTournamentId = id || null;
   renderHistoryDashboard();
 };
 
 window.openHistoryPlayer = function openHistoryPlayer(id) {
-  historyState.selectedPlayerId = id;
+  historyState.selectedPlayerId = id || null;
   renderHistoryDashboard();
 };
 
 window.openHistoryPair = function openHistoryPair(id) {
-  historyState.selectedPairId = id;
+  historyState.selectedPairId = id || null;
   renderHistoryDashboard();
 };
-
-function getHistoryPanels() {
-  return {
-    subTabs: Array.from(document.querySelectorAll('[data-history-tab]')),
-    tournamentsPanel: document.getElementById('historyList'),
-    playersPanel: document.getElementById('historyPlayersPanel'),
-    pairsPanel: document.getElementById('historyPairsPanel'),
-    placeFilter: document.getElementById('historyPlaceFilter'),
-    participantFilter: document.getElementById('historyParticipantFilter'),
-    playerFilter: document.getElementById('historyPlayerFilter'),
-    pairFilter: document.getElementById('historyPairFilter'),
-  };
-}
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -2076,146 +2144,156 @@ function buildPlayerHistoryStats(entries) {
 }
 
 function renderHistoryDashboard() {
-  const panels = getHistoryPanels();
-  if (!panels.tournamentsPanel || !panels.playersPanel || !panels.pairsPanel) {
+  {
+  const root = document.getElementById('historyRoot');
+  if (!root) {
     return;
   }
 
-  panels.subTabs.forEach((button) => {
-    button.classList.toggle('is-active', button.dataset.historyTab === historyState.activeTab);
-  });
-
   const entries = normalizeHistoryEntries();
-  const placeQuery = (panels.placeFilter?.value ?? '').trim().toLowerCase();
-  const dateQuery = panels.dateFilter?.value ?? '';
-  const participantQuery = (panels.participantFilter?.value ?? '').trim().toLowerCase();
+  const placeQuery = historyState.tournamentPlaceQuery.trim().toLowerCase();
+  const participantQuery = historyState.tournamentParticipantQuery.trim().toLowerCase();
+  const playerQuery = historyState.playerQuery.trim().toLowerCase();
+  const pairQuery = historyState.pairQuery.trim().toLowerCase();
+  const hasEntries = entries.length > 0;
 
   const filteredEntries = entries.filter((entry) => {
     const tournament = entry.tournament ?? {};
-    const dateValue = (tournament.date ?? entry.archivedAt ?? '').slice(0, 10);
     const placeMatch = !placeQuery || String(tournament.place ?? '').toLowerCase().includes(placeQuery);
-    const dateMatch = !dateQuery || dateValue === dateQuery;
     const participantMatch = !participantQuery || getTournamentSearchBlob(entry).includes(participantQuery);
-    return placeMatch && dateMatch && participantMatch;
+    return placeMatch && participantMatch;
   });
 
-  panels.tournamentsPanel.hidden = historyState.activeTab !== 'tournaments';
-  panels.tournamentsPanel.classList.toggle('is-hidden', historyState.activeTab !== 'tournaments');
-  panels.playersPanel.hidden = historyState.activeTab !== 'players';
-  panels.playersPanel.classList.toggle('is-hidden', historyState.activeTab !== 'players');
-  panels.pairsPanel.hidden = historyState.activeTab !== 'pairs';
-  panels.pairsPanel.classList.toggle('is-hidden', historyState.activeTab !== 'pairs');
+  const tabsMarkup = [
+    ['tournaments', 'Torneos'],
+    ['pairs', 'Parejas'],
+    ['players', 'Jugadores'],
+  ]
+    .map(([tab, label]) => `<button class="subtab ${historyState.activeTab === tab ? 'is-active' : ''}" type="button" onclick="openHistoryTab('${tab}')">${label}</button>`)
+    .join('');
 
-  if (historyState.activeTab === 'tournaments') {
+  let bodyMarkup = '';
+  if (!hasEntries) {
+    bodyMarkup = `
+      <article class="history-detail-card history-empty-state">
+        <div class="history-detail-head">
+          <div>
+            <p class="eyebrow">Historial vacío</p>
+            <h3>No hay torneos archivados todavía</h3>
+            <p class="muted">Cuando cierres un torneo, va a aparecer acá con sus torneos, parejas y jugadores.</p>
+          </div>
+        </div>
+      </article>
+    `;
+  } else if (historyState.activeTab === 'tournaments') {
     const selectedEntry = filteredEntries.find((entry) => entry.id === historyState.selectedTournamentId) ?? filteredEntries[0] ?? null;
-    panels.tournamentsPanel.innerHTML = `
-      <div class="history-list">
-        ${filteredEntries.length ? filteredEntries.map((entry) => {
-          const tournament = entry.tournament ?? {};
-          const isSelected = selectedEntry?.id === entry.id;
-          const winners = Array.isArray(entry.pairs) ? entry.pairs.filter((pair) => pair?.id === tournament.winnerId).map((pair) => getPairLabel(pair)).join(' / ') : '';
-          return `
-            <button class="history-item ${isSelected ? 'is-selected' : ''}" type="button" onclick="openHistoryTournament('${escapeHtml(entry.id)}')">
-              <strong>${escapeHtml(tournament.name ?? 'Torneo sin nombre')}</strong>
-              <span>${escapeHtml(formatHistoryDate(tournament.date ?? entry.archivedAt))} · ${escapeHtml(tournament.place ?? 'Sin lugar')}</span>
-              <span>${escapeHtml(tournament.mode ?? 'Sin modo')} · ${escapeHtml(entry.pairs?.length ?? 0)} parejas</span>
-              <span>${escapeHtml(winners || 'Ganador no declarado')}</span>
-            </button>
-          `;
-        }).join('') : '<div class="empty-state">No hay torneos archivados.</div>'}
+    bodyMarkup = `
+      <div class="history-filters">
+        <label>
+          <span>Filtro por lugar</span>
+          <input type="search" value="${escapeHtml(historyState.tournamentPlaceQuery)}" oninput="setHistoryQuery('tournamentPlaceQuery', this.value)" placeholder="Buscar lugar" />
+        </label>
+        <label>
+          <span>Filtro por participante</span>
+          <input type="search" value="${escapeHtml(historyState.tournamentParticipantQuery)}" oninput="setHistoryQuery('tournamentParticipantQuery', this.value)" placeholder="Buscar jugador o pareja" />
+        </label>
       </div>
+      <div class="history-view-grid">
+        <div class="history-list">
+          ${filteredEntries.length ? filteredEntries.map((entry) => {
+            const tournament = entry.tournament ?? {};
+            const isSelected = selectedEntry?.id === entry.id;
+            const winners = Array.isArray(entry.pairs) ? entry.pairs.filter((pair) => pair?.id === tournament.winnerId).map((pair) => getPairLabel(pair)).join(' / ') : '';
+            return `
+              <button class="history-item ${isSelected ? 'is-selected' : ''}" type="button" onclick="openHistoryTournament('${escapeHtml(entry.id)}')">
+                <strong>${escapeHtml(tournament.name ?? 'Torneo sin nombre')}</strong>
+                <span>${escapeHtml(formatHistoryDate(tournament.date ?? entry.archivedAt))} · ${escapeHtml(tournament.place ?? 'Sin lugar')}</span>
+                <span>${escapeHtml(tournament.mode ?? 'Sin modo')} · ${escapeHtml(entry.pairs?.length ?? 0)} parejas</span>
+                <span>${escapeHtml(winners || 'Ganador no declarado')}</span>
+              </button>
+            `;
+          }).join('') : '<div class="empty-state">No hay torneos archivados.</div>'}
+        </div>
+        <div class="history-detail">
+          ${selectedEntry ? renderHistoryTournamentDetail(selectedEntry) : '<div class="empty-state">Seleccioná un torneo para ver el detalle.</div>'}
+        </div>
+      </div>
+    `;
+  } else if (historyState.activeTab === 'players') {
+    const playerStats = buildPlayerHistoryStats(entries);
+    const filteredPlayers = playerStats.filter((player) => !playerQuery || getPlayerStatSearchBlob(player).includes(playerQuery));
+    const selectedPlayer = filteredPlayers.find((player) => player.playerId === historyState.selectedPlayerId) ?? filteredPlayers[0] ?? null;
+    bodyMarkup = `
+      <label class="history-search">
+        <span>Buscar jugador</span>
+        <input type="search" value="${escapeHtml(historyState.playerQuery)}" oninput="setHistoryQuery('playerQuery', this.value)" placeholder="Nombre, apellido o alias" />
+      </label>
       <div class="history-detail">
-        ${
-          selectedEntry
-            ? renderHistoryTournamentDetail(selectedEntry)
-            : '<div class="empty-state">Seleccioná un torneo para ver el detalle.</div>'
-        }
+        ${selectedPlayer ? renderHistoryPlayerDetail(selectedPlayer) : '<div class="empty-state">Seleccioná un jugador para ver el detalle.</div>'}
+      </div>
+      <div class="history-grid">
+        ${filteredPlayers.map((player) => `
+          <button class="history-stat-card history-stat-button ${selectedPlayer?.playerId === player.playerId ? 'is-selected' : ''}" type="button" onclick="openHistoryPlayer('${escapeHtml(player.playerId)}')">
+            <div class="history-stat-head">
+              <strong>${escapeHtml(player.name)}</strong>
+              <span>${player.tournamentsWon} torneos ganados</span>
+            </div>
+            <div class="history-stat-metrics">
+              <div><span>Torneos</span><strong>${player.tournamentsPlayed}</strong></div>
+              <div><span>Ganados</span><strong>${player.tournamentsWon}</strong></div>
+              <div><span>Sets</span><strong>${player.setsFor}-${player.setsAgainst}</strong></div>
+              <div><span>Games</span><strong>${player.gamesFor}-${player.gamesAgainst}</strong></div>
+            </div>
+            <div class="ideal-pairs">
+              <span>Parejas ideales</span>
+              <small>${player.idealPairs.length ? player.idealPairs.map((pair) => escapeHtml(pair.name)).join(' · ') : 'Sin datos suficientes'}</small>
+            </div>
+          </button>
+        `).join('')}
+      </div>
+    `;
+  } else if (historyState.activeTab === 'pairs') {
+    const pairStats = buildPairHistoryStats(entries);
+    const filteredPairs = pairStats.filter((pair) => !pairQuery || getPairSearchBlob(pair).includes(pairQuery));
+    const selectedPair = filteredPairs.find((pair) => pair.pairId === historyState.selectedPairId) ?? filteredPairs[0] ?? null;
+    bodyMarkup = `
+      <label class="history-search">
+        <span>Buscar pareja</span>
+        <input type="search" value="${escapeHtml(historyState.pairQuery)}" oninput="setHistoryQuery('pairQuery', this.value)" placeholder="Nombre, apellido o alias" />
+      </label>
+      <div class="history-detail">
+        ${selectedPair ? renderHistoryPairDetail(selectedPair) : '<div class="empty-state">Seleccioná una pareja para ver el detalle.</div>'}
+      </div>
+      <div class="history-grid">
+        ${filteredPairs.map((pair) => `
+          <button class="history-stat-card history-stat-button ${selectedPair?.pairId === pair.pairId ? 'is-selected' : ''}" type="button" onclick="openHistoryPair('${escapeHtml(pair.pairId)}')">
+            <div class="history-stat-head">
+              <strong>${escapeHtml(pair.name)}</strong>
+              <span>${pair.tournamentsWon} torneos ganados</span>
+            </div>
+            <div class="history-stat-metrics">
+              <div><span>Torneos</span><strong>${pair.tournamentsPlayed}</strong></div>
+              <div><span>Ganados</span><strong>${pair.tournamentsWon}</strong></div>
+              <div><span>Sets</span><strong>${pair.setsFor}-${pair.setsAgainst}</strong></div>
+              <div><span>Games</span><strong>${pair.gamesFor}-${pair.gamesAgainst}</strong></div>
+            </div>
+          </button>
+        `).join('')}
       </div>
     `;
   }
 
-  if (historyState.activeTab === 'players') {
-    const playerStats = buildPlayerHistoryStats(entries);
-    const playerQuery = (panels.playerFilter?.value ?? '').trim().toLowerCase();
-    const filteredPlayers = playerStats.filter((player) => {
-      return !playerQuery || getPlayerStatSearchBlob(player).includes(playerQuery);
-    });
-    const selectedPlayer =
-      filteredPlayers.find((player) => player.playerId === historyState.selectedPlayerId) ??
-      filteredPlayers[0] ??
-      null;
-    panels.playersPanel.innerHTML = playerStats.length
-      ? `
-        <label class="history-search">
-          <span>Buscar jugador</span>
-          <input id="historyPlayerFilter" type="search" placeholder="Nombre, apellido o alias" value="${escapeHtml(playerQuery)}" />
-        </label>
-        <div class="history-grid">
-          ${filteredPlayers.map((player) => `
-            <button class="history-stat-card history-stat-button ${selectedPlayer?.playerId === player.playerId ? 'is-selected' : ''}" type="button" onclick="openHistoryPlayer('${escapeHtml(player.playerId)}')">
-              <div class="history-stat-head">
-                <strong>${escapeHtml(player.name)}</strong>
-                <span>${player.tournamentsWon} torneos ganados</span>
-              </div>
-              <div class="history-stat-metrics">
-                <div><span>Torneos</span><strong>${player.tournamentsPlayed}</strong></div>
-                <div><span>Ganados</span><strong>${player.tournamentsWon}</strong></div>
-                <div><span>Sets</span><strong>${player.setsFor}-${player.setsAgainst}</strong></div>
-                <div><span>Games</span><strong>${player.gamesFor}-${player.gamesAgainst}</strong></div>
-              </div>
-              <div class="ideal-pairs">
-                <span>Parejas ideales</span>
-                <small>${player.idealPairs.length ? player.idealPairs.map((pair) => escapeHtml(pair.name)).join(' · ') : 'Sin datos suficientes'}</small>
-              </div>
-            </button>
-          `).join('')}
-        </div>
-        <div class="history-detail">
-          ${selectedPlayer ? renderHistoryPlayerDetail(selectedPlayer) : '<div class="empty-state">Seleccioná un jugador para ver el detalle.</div>'}
-        </div>
-      `
-      : '<div class="empty-state">No hay jugadores históricos todavía.</div>';
+  root.innerHTML = `
+    <span class="card-label">Torneos guardados</span>
+    <div class="subtabs" role="tablist" aria-label="Historial">
+      ${tabsMarkup}
+    </div>
+    <div class="history-view">
+      ${bodyMarkup}
+    </div>
+  `;
+  return;
   }
-
-  if (historyState.activeTab === 'pairs') {
-    const pairStats = buildPairHistoryStats(entries);
-    const pairQuery = (panels.pairFilter?.value ?? '').trim().toLowerCase();
-    const filteredPairs = pairStats.filter((pair) => {
-      return !pairQuery || getPairSearchBlob(pair).includes(pairQuery);
-    });
-    const selectedPair =
-      filteredPairs.find((pair) => pair.pairId === historyState.selectedPairId) ??
-      filteredPairs[0] ??
-      null;
-    panels.pairsPanel.innerHTML = pairStats.length
-      ? `
-        <label class="history-search">
-          <span>Buscar pareja</span>
-          <input id="historyPairFilter" type="search" placeholder="Nombre, apellido o alias" value="${escapeHtml(pairQuery)}" />
-        </label>
-        <div class="history-grid">
-          ${filteredPairs.map((pair) => `
-            <button class="history-stat-card history-stat-button ${selectedPair?.pairId === pair.pairId ? 'is-selected' : ''}" type="button" onclick="openHistoryPair('${escapeHtml(pair.pairId)}')">
-              <div class="history-stat-head">
-                <strong>${escapeHtml(pair.name)}</strong>
-                <span>${pair.tournamentsWon} torneos ganados</span>
-              </div>
-              <div class="history-stat-metrics">
-                <div><span>Torneos</span><strong>${pair.tournamentsPlayed}</strong></div>
-                <div><span>Ganados</span><strong>${pair.tournamentsWon}</strong></div>
-                <div><span>Sets</span><strong>${pair.setsFor}-${pair.setsAgainst}</strong></div>
-                <div><span>Games</span><strong>${pair.gamesFor}-${pair.gamesAgainst}</strong></div>
-              </div>
-            </button>
-          `).join('')}
-        </div>
-        <div class="history-detail">
-          ${selectedPair ? renderHistoryPairDetail(selectedPair) : '<div class="empty-state">Seleccioná una pareja para ver el detalle.</div>'}
-        </div>
-      `
-      : '<div class="empty-state">No hay parejas históricas todavía.</div>';
-  }
-
 }
 
 function renderHistoryTournamentDetail(entry) {
@@ -2357,48 +2435,3 @@ function renderHistoryPlayerDetail(player) {
   `;
 }
 
-document.addEventListener('click', (event) => {
-  const target = event.target instanceof Element ? event.target : null;
-  if (!target) return;
-
-  const tabButton = target.closest('[data-history-tab]');
-  if (tabButton) {
-    historyState.activeTab = tabButton.dataset.historyTab || 'tournaments';
-    renderHistoryDashboard();
-    return;
-  }
-
-  const playerButton = target.closest('[data-history-player-open]');
-  if (playerButton) {
-    historyState.selectedPlayerId = playerButton.dataset.historyPlayerOpen;
-    renderHistoryDashboard();
-    return;
-  }
-
-  const pairButton = target.closest('[data-history-pair-open]');
-  if (pairButton) {
-    historyState.selectedPairId = pairButton.dataset.historyPairOpen;
-    renderHistoryDashboard();
-    return;
-  }
-
-  const tournamentButton = target.closest('[data-history-open]');
-  if (tournamentButton) {
-    historyState.selectedTournamentId = tournamentButton.dataset.historyOpen;
-    renderHistoryDashboard();
-  }
-});
-
-document.addEventListener('input', (event) => {
-  const target = event.target;
-  if (!target) return;
-  if (
-    target.id === 'historyPlaceFilter' ||
-    target.id === 'historyParticipantFilter' ||
-    target.id === 'historyPlayerFilter' ||
-    target.id === 'historyPairFilter'
-  ) {
-    historyState.selectedTournamentId = null;
-    renderHistoryDashboard();
-  }
-});

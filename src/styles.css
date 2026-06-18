@@ -519,6 +519,11 @@ label {
   background: rgba(9, 16, 31, 0.72);
 }
 
+.match-block {
+  display: grid;
+  gap: 0.55rem;
+}
+
 .group-title,
 .match-title,
 .standing-title {
@@ -532,6 +537,26 @@ label {
   color: var(--muted);
   font-size: 0.92rem;
   line-height: 1.45;
+}
+
+.match-agenda-form {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+  padding: 0.8rem;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.46);
+}
+
+.match-agenda-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.92rem;
+}
+
+.match-agenda-form button {
+  justify-self: start;
 }
 
 .group-table-wrap {
@@ -1036,21 +1061,55 @@ select option {
   display: flex;
   gap: 0.7rem;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .subtab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  background: rgba(9, 16, 31, 0.85);
+  color: var(--muted);
   border-radius: 999px;
-  padding-inline: 1rem;
+  padding: 0.9rem 1.1rem;
+  font: inherit;
+  font-weight: 700;
+  line-height: 1;
+  transition: transform 140ms ease, box-shadow 140ms ease, background-color 140ms ease, color 140ms ease, border-color 140ms ease, opacity 140ms ease;
 }
 
 .subtab.is-active {
   background: linear-gradient(135deg, rgba(37, 99, 235, 0.9), rgba(14, 165, 233, 0.88));
   color: #eff6ff;
+  border-color: transparent;
 }
 
 .history-panel {
   display: grid;
   gap: 1rem;
+}
+
+.history-root {
+  display: grid;
+  gap: 1rem;
+}
+
+.history-view {
+  display: grid;
+  gap: 1rem;
+}
+
+.history-view-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.history-empty-state {
+  min-height: 180px;
+  display: grid;
+  align-items: center;
 }
 
 .history-filters {
@@ -1139,6 +1198,10 @@ select option {
 
 .history-stat-button:hover {
   transform: translateY(-1px);
+}
+
+.history-detail {
+  scroll-margin-top: 1rem;
 }
 
 .history-stat-head {
