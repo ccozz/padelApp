@@ -35,8 +35,6 @@ const canArchiveTournament = () => {
 };
 const resultsList = document.getElementById('resultsList');
 const historyList = document.getElementById('historyList');
-const historyDateFilter = document.getElementById('historyDateFilter');
-const historyPlayerFilter = document.getElementById('historyPlayerFilter');
 const fixtureStatusFilter = document.getElementById('fixtureStatusFilter');
 const fixturePlayerFilter = document.getElementById('fixturePlayerFilter');
 const tournamentWinner = document.getElementById('tournamentWinner');
@@ -829,59 +827,7 @@ const renderResults = () => {
 };
 
 const renderHistory = () => {
-  const state = getState();
-  const dateFilter = historyDateFilter.value.trim();
-  const playerFilter = normalizeText(historyPlayerFilter.value || '').toLowerCase();
-
-  const records = [...(state.history || [])]
-    .sort((left, right) => new Date(right.archivedAt) - new Date(left.archivedAt))
-    .filter((record) => {
-      const matchesDate = !dateFilter || record.archivedAt.slice(0, 10) === dateFilter;
-      if (!matchesDate) {
-        return false;
-      }
-
-      if (!playerFilter) {
-        return true;
-      }
-
-      const searchBlob = [
-        record.tournamentName,
-        ...(record.pairs || []).flatMap((pair) => [pair.name, pair.playerOne, pair.playerTwo]),
-      ]
-        .join(' ')
-        .toLowerCase();
-
-      return searchBlob.includes(playerFilter);
-    });
-
-  if (records.length === 0) {
-    historyList.innerHTML = '<div class="placeholder">No hay torneos archivados para ese filtro.</div>';
-    return;
-  }
-
-  historyList.innerHTML = records
-    .map((record) => {
-      const topNames = (record.standings || [])
-        .slice(0, 3)
-        .map((row) => row.name)
-        .join(' · ');
-
-      return `
-        <article class="history-item">
-          <div class="history-title">${record.tournamentName}</div>
-          <div class="history-meta">
-            Archivado: ${new Date(record.archivedAt).toLocaleDateString('es-AR')} · ${record.status} · ${record.pairs.length} parejas
-          </div>
-          <div class="history-meta">
-            Torneo: ${record.tournamentDate ? new Date(`${record.tournamentDate}T00:00:00`).toLocaleDateString('es-AR') : 'Sin fecha'} · ${formatTournamentMode(record.tournamentMode)} · ${record.tournamentPlace || 'Sin lugar'}
-          </div>
-          <div class="history-meta">Campeón: ${record.winnerName || 'Sin definir'}</div>
-          <div class="history-meta">Top: ${topNames || 'Sin tabla'}</div>
-        </article>
-      `;
-    })
-    .join('');
+  renderHistoryDashboard();
 };
 
 const renderAll = () => {
@@ -1689,8 +1635,6 @@ archiveTournament.addEventListener('click', () => {
   setActiveTab('historial');
 });
 
-historyDateFilter.addEventListener('input', renderAll);
-historyPlayerFilter.addEventListener('input', renderAll);
 fixtureStatusFilter.addEventListener('change', renderAll);
 fixturePlayerFilter.addEventListener('input', renderAll);
 tournamentWinner.addEventListener('change', () => {
@@ -2450,7 +2394,6 @@ document.addEventListener('input', (event) => {
   if (!target) return;
   if (
     target.id === 'historyPlaceFilter' ||
-    target.id === 'historyDateFilter' ||
     target.id === 'historyParticipantFilter' ||
     target.id === 'historyPlayerFilter' ||
     target.id === 'historyPairFilter'
