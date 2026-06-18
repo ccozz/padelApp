@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f172a" />
+    <title>padelApp</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Torneo de padel</p>
+          <h1>padelApp</h1>
+          <p class="subtitle">
+            Gestión mobile-first para torneos: reglas, parejas, grupos, cuadro y estadísticas.
+          </p>
+        </div>
+        <div class="hero-card">
+          <span class="hero-label">Estado</span>
+          <strong id="tournamentStatus">Proyecto inicial</strong>
+          <small>Vista pública + panel admin</small>
+        </div>
+      </header>
+
+      <nav class="tabs" aria-label="Secciones del torneo">
+        <button class="tab is-active" data-tab="torneo">Torneo</button>
+        <button class="tab" data-tab="reglas">Reglas</button>
+        <button class="tab" data-tab="parejas">Parejas</button>
+        <button class="tab" data-tab="admin">Admin</button>
+      </nav>
+
+      <main>
+        <section class="panel is-active" id="tab-torneo">
+          <div class="section-head">
+            <h2>Información del torneo</h2>
+            <p>Resumen público de la competencia.</p>
+          </div>
+          <div class="grid cards">
+            <article class="card">
+              <span class="card-label">Formato</span>
+              <strong>Grupos + eliminación</strong>
+              <p>Fase inicial normalizada y cuadro final automático.</p>
+            </article>
+            <article class="card">
+              <span class="card-label">Puntaje</span>
+              <strong>Victoria 3 / Derrota 1</strong>
+              <p>Regla base definida para esta versión.</p>
+            </article>
+            <article class="card">
+              <span class="card-label">Desempate</span>
+              <strong>Directo, sets, games</strong>
+              <p>Orden de desempate por enfrentamiento y métricas deportivas.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel" id="tab-reglas">
+          <div class="section-head">
+            <h2>Reglas</h2>
+            <p>Reglas consolidadas para el armado del torneo.</p>
+          </div>
+          <ul class="rules-list" id="rulesList"></ul>
+        </section>
+
+        <section class="panel" id="tab-parejas">
+          <div class="section-head">
+            <h2>Parejas</h2>
+            <p>Registro de parejas cargadas en el sistema.</p>
+          </div>
+          <div class="pairs-toolbar">
+            <div class="toolbar-card">
+              <span class="card-label">Total</span>
+              <strong id="pairsCount">0</strong>
+            </div>
+            <div class="toolbar-card">
+              <span class="card-label">Guardado</span>
+              <strong>Local</strong>
+            </div>
+          </div>
+          <div class="pairs-list" id="pairsList"></div>
+        </section>
+
+        <section class="panel" id="tab-admin">
+          <div class="section-head">
+            <h2>Panel de admin</h2>
+            <p>Carga de parejas para preparar el torneo.</p>
+          </div>
+
+          <form class="admin-form" id="pairForm">
+            <label>
+              Nombre de la pareja
+              <input id="pairName" type="text" placeholder="Ej: Juli Gutiérrez / Mery Arma" required />
+            </label>
+            <label>
+              Jugadora 1
+              <input id="playerOne" type="text" placeholder="Nombre y apellido" required />
+            </label>
+            <label>
+              Jugadora 2
+              <input id="playerTwo" type="text" placeholder="Nombre y apellido" required />
+            </label>
+            <button type="submit" class="primary">Agregar pareja</button>
+          </form>
+
+          <div class="admin-actions">
+            <button type="button" class="secondary" id="clearPairs">Vaciar parejas</button>
+            <button type="button" class="primary" id="planTournament">
+              Planificar automáticamente
+            </button>
+          </div>
+
+          <section class="placeholder">
+            <h3>Motor del torneo</h3>
+            <p>
+              Acá va la lógica de armado de grupos, cruces, tabla general, promedios y cuadro final.
+            </p>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
