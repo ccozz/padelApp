@@ -72,29 +72,6 @@ const adminPassword = document.getElementById('adminPassword');
 const adminLogout = document.getElementById('adminLogout');
 const adminTab = [...tabButtons].find((button) => button.dataset.tab === 'admin');
 
-if (tournamentForm) {
-  tournamentForm.addEventListener('submit', () => {
-    window.setTimeout(() => {
-      const state = getState();
-      const tournament = state?.tournament;
-      if (!tournament?.createdAt || tournament.status === 'Torneo archivado') {
-        return;
-      }
-
-      const nextName = formatTournamentActiveLabel(tournament.place, tournament.date);
-      if (tournament.name !== nextName) {
-        setState({
-          ...state,
-          tournament: {
-            ...tournament,
-            name: nextName,
-          },
-        });
-      }
-    }, 0);
-  });
-}
-
 const getState = () => loadState();
 
 const rebuildDerivedState = (state) => {
@@ -113,20 +90,8 @@ const rebuildDerivedState = (state) => {
 
 const setState = (nextState) => {
   saveState(rebuildDerivedState(nextState));
-  try {
-    renderAll();
-    hydrateFixtureEditors();
-  } catch (error) {
-    console.error(error);
-    const statusNode = document.getElementById('tournamentStatus');
-    if (statusNode) {
-      statusNode.textContent = `Error: ${error.message}`;
-    }
-    throw error;
-  }
+  renderAll();
 };
-
-window.addEventListener('load', hydrateFixtureEditors);
 
 const getPairMap = (pairs) => new Map(pairs.map((pair) => [pair.id, pair]));
 const getPlayerMap = (players) => new Map(players.map((player) => [player.id, player]));
@@ -172,87 +137,10 @@ const formatTournamentMode = (mode) => {
   return mode || 'Sin modo';
 };
 
-const formatTournamentActiveLabel = (place, dateValue) => {
-  const cleanPlace = String(place || '').trim() || 'LUGAR';
-  const date = dateValue ? new Date(`${dateValue}T00:00:00`) : null;
-  const formattedDate =
-    date && !Number.isNaN(date.getTime())
-      ? `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`
-      : 'DD/MM';
-
-  return `TORNEO EN ${cleanPlace} ${formattedDate}`;
-};
-
 const hasActiveTournament = (state) =>
   Boolean(state.tournament.createdAt) && state.tournament.status !== 'Torneo archivado';
 
 const canEditTournament = () => isAdminUnlocked() && !isTournamentFinalized();
-
-const ensureActiveTournament = (state) => {
-  if (hasActiveTournament(state)) {
-    return state.tournament;
-  }
-
-  return {
-    ...state.tournament,
-    name: formatTournamentActiveLabel(state.tournament.place || 'Cancha principal', state.tournament.date || formatInputDate(new Date())),
-    date: state.tournament.date || formatInputDate(new Date()),
-    mode: state.tournament.mode || 'clasico',
-    place: state.tournament.place || 'Cancha principal',
-    createdAt: state.tournament.createdAt || new Date().toISOString(),
-    status: 'Torneo activo',
-    winnerId: null,
-    closedAt: null,
-  };
-};
-
-const handlePlanTournament = (event) => {
-  event?.preventDefault?.();
-  event?.stopImmediatePropagation?.();
-
-  if (!isAdminUnlocked()) {
-    alert('Desbloqueá el panel de admin primero.');
-    return;
-  }
-
-  const state = getState();
-
-  if (!state.pairs.length) {
-    alert('Agregá al menos una pareja.');
-    return;
-  }
-
-  const tournament = ensureActiveTournament(state);
-  const groupCount = Math.max(2, Math.ceil(state.pairs.length / 3));
-  const groups = buildBalancedGroups(state.pairs, groupCount);
-  const matches = buildBalancedCrossGroupFixtures(state.pairs, groups, 2);
-  const standings = buildStandings(state.pairs, matches);
-
-  try {
-    setState({
-      ...state,
-      tournament: {
-        ...tournament,
-        status: 'Torneo planificado',
-        winnerId: null,
-        closedAt: null,
-      },
-      groups,
-      matches,
-      standings,
-      bracket: [],
-      bracketResults: [],
-      bracketChampion: null,
-    });
-    setActiveTab('torneo');
-  } catch (error) {
-    console.error(error);
-    alert(`Error al planificar: ${error.message}`);
-  }
-};
-
-planTournament?.addEventListener('click', handlePlanTournament, true);
-window.planTournamentAutomatically = handlePlanTournament;
 
 const isAdminTabActive = () => document.getElementById('tab-admin')?.classList.contains('is-active');
 
@@ -274,52 +162,6 @@ const closePlayersModalView = () => {
   playersModal.hidden = true;
   playersModal.classList.add('is-hidden');
   playersModal.setAttribute('aria-hidden', 'true');
-};
-
-const hydrateFixtureEditors = () => {
-  const state = getState();
-  const adminAllowed = isAdminUnlocked() && !isTournamentFinalized();
-  const matchBlocks = document.querySelectorAll('.match-block');
-
-  matchBlocks.forEach((matchBlock) => {
-    matchBlock.classList.toggle('is-admin-editable', adminAllowed);
-    matchBlock.classList.remove('is-editing');
-
-    const agendaForm = matchBlock.querySelector('.match-agenda-form');
-    if (!agendaForm) {
-      return;
-    }
-
-    let toggleButton = matchBlock.querySelector('[data-match-edit-toggle]');
-    if (adminAllowed) {
-      if (!toggleButton) {
-        toggleButton = document.createElement('button');
-        toggleButton.type = 'button';
-        toggleButton.className = 'match-edit-toggle';
-        toggleButton.dataset.matchEditToggle = 'true';
-        toggleButton.textContent = 'Editar día y hora';
-        agendaForm.parentElement?.insertBefore(toggleButton, agendaForm);
-      }
-    } else if (toggleButton) {
-      toggleButton.remove();
-    }
-  });
-
-  if (!adminAllowed) {
-    return;
-  }
-
-  document.querySelectorAll('[data-match-edit-toggle]').forEach((button) => {
-    button.onclick = () => {
-      const matchBlock = button.closest('.match-block');
-      if (!matchBlock) {
-        return;
-      }
-
-      const isEditing = matchBlock.classList.toggle('is-editing');
-      button.textContent = isEditing ? 'Ocultar edición' : 'Editar día y hora';
-    };
-  });
 };
 
 const getMatchWinnerFromScore = (match, setsA, setsB, gamesA, gamesB) => {
@@ -402,7 +244,7 @@ const renderTournamentInfo = () => {
     tournament.place || 'Sin lugar',
   ];
 
-  tournamentInfoTitle.textContent = tournament.name || formatTournamentActiveLabel(tournament.place, tournament.date);
+  tournamentInfoTitle.textContent = tournament.name || 'Torneo actual';
   tournamentInfoMeta.textContent = `${parts.join(' · ')} · ${tournament.status}`;
 };
 
@@ -516,7 +358,6 @@ const renderWinnerSelect = () => {
 const renderGroups = () => {
   const state = getState();
   const pairMap = getPairMap(state.pairs);
-  const players = state.players || [];
   const groupStats = new Map();
 
   state.matches.forEach((match) => {
@@ -575,12 +416,11 @@ const renderGroups = () => {
           };
         })
         .sort((left, right) => right.wins - left.wins || right.setsDiff - left.setsDiff || right.gamesDiff - left.gamesDiff || left.name.localeCompare(right.name, 'es'));
-      const groupSummary = rows.map((row) => row.name).join(' / ');
 
       return `
         <article class="group-block">
           <div class="group-title">${group.name}</div>
-          <div class="group-meta">${groupSummary || `${group.pairIds.length} parejas`}</div>
+          <div class="group-meta">${row.playerOneLabel} / ${row.playerTwoLabel}</div>
           <div class="group-table-wrap">
             <table class="group-table">
               <colgroup>
@@ -1756,11 +1596,6 @@ loadSamplePairs.addEventListener('click', () => {
     pairs: nextPairs,
     tournament: {
       ...state.tournament,
-      name: state.tournament.name || 'Torneo de prueba',
-      date: state.tournament.date || formatInputDate(new Date()),
-      mode: state.tournament.mode || 'Clásico',
-      place: state.tournament.place || 'Cancha principal',
-      createdAt: state.tournament.createdAt || new Date().toISOString(),
       status: 'Parejas de prueba cargadas',
       winnerId: null,
       closedAt: null,
@@ -1944,7 +1779,7 @@ function getPanelByTitle(title) {
 function syncTournamentPanelsVisibility() {
   const state = getState();
   const tournament = state?.tournament ?? {};
-  const hasActiveTournament = Boolean(tournament.createdAt) && tournament.status !== 'Torneo archivado';
+  const hasActiveTournament = tournament.status !== 'Sin torneo activo' && Boolean(tournament.name);
   const showPodium = hasActiveTournament && tournament.status === 'Torneo archivado' && Boolean(tournament.closedAt);
 
   document.body.classList.toggle('no-active-tournament', !hasActiveTournament);

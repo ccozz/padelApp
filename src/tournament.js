@@ -129,34 +129,6 @@ export const buildBalancedCrossGroupFixtures = (pairs, groups, targetMatches = 2
 
   placeMatches();
 
-  if (matches.length === 0 && pairs.length >= 2) {
-    const fallbackPairs = [...pairs].sort((left, right) => left.name.localeCompare(right.name, 'es'));
-
-    for (let index = 0; index + 1 < fallbackPairs.length; index += 2) {
-      const pairA = fallbackPairs[index];
-      const pairB = fallbackPairs[index + 1];
-
-      matches.push({
-        id: createMatchId(pairA.id, pairB.id, index + 1),
-        stage: 'groups',
-        pairAId: pairA.id,
-        pairBId: pairB.id,
-        pairALabel: pairById.get(pairA.id)?.name || getPairLabel(pairA),
-        pairBLabel: pairById.get(pairB.id)?.name || getPairLabel(pairB),
-        date: '',
-        time: '',
-        venue: '',
-        scoreA: null,
-        scoreB: null,
-        setsA: null,
-        setsB: null,
-        gamesA: null,
-        gamesB: null,
-        played: false,
-      });
-    }
-  }
-
   return matches;
 };
 
