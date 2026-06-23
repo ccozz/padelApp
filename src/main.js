@@ -1,5 +1,5 @@
 import { defaultState, rules } from './constants.js';
-import { isAdminUnlocked, lockAdmin, unlockAdmin } from './auth.js';
+import { forceLockAdmin, isAdminUnlocked, lockAdmin, unlockAdmin } from './auth.js';
 import { createId, loadState, normalizeText, saveState } from './storage.js';
 import {
   buildBalancedCrossGroupFixtures,
@@ -68,9 +68,53 @@ const deleteCurrentTournament = document.getElementById('deleteCurrentTournament
 const adminLock = document.getElementById('adminLock');
 const adminContent = document.getElementById('adminContent');
 const adminLoginForm = document.getElementById('adminLoginForm');
+const adminLoginButton = document.getElementById('adminLoginButton');
 const adminPassword = document.getElementById('adminPassword');
 const adminLogout = document.getElementById('adminLogout');
 const adminTab = [...tabButtons].find((button) => button.dataset.tab === 'admin');
+
+window.adminLoginSubmit = (event) => {
+  event?.preventDefault?.();
+  event?.stopImmediatePropagation?.();
+  unlockAdmin();
+  if (adminPassword) {
+    adminPassword.value = '';
+  }
+  if (adminLock) {
+    adminLock.hidden = true;
+  }
+  if (adminContent) {
+    adminContent.hidden = false;
+  }
+  if (adminTab) {
+    adminTab.classList.add('is-active');
+  }
+  renderAll();
+  syncTournamentCreationState();
+  syncAdminTwoColumnLayout();
+  syncAdminFormLabels();
+  setActiveTab('admin');
+  return false;
+};
+
+adminLoginButton?.addEventListener('click', window.adminLoginSubmit, true);
+
+adminLogout?.addEventListener(
+  'click',
+  (event) => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    forceLockAdmin();
+    if (adminLock) {
+      adminLock.hidden = false;
+    }
+    if (adminContent) {
+      adminContent.hidden = true;
+    }
+    renderAll();
+  },
+  true,
+);
 
 const getState = () => loadState();
 
@@ -141,6 +185,186 @@ const hasActiveTournament = (state) =>
   Boolean(state.tournament.createdAt) && state.tournament.status !== 'Torneo archivado';
 
 const canEditTournament = () => isAdminUnlocked() && !isTournamentFinalized();
+
+const findSharedAncestor = (leftNode, rightNode) => {
+  const ancestors = new Set();
+  let current = leftNode;
+  while (current) {
+    ancestors.add(current);
+    current = current.parentElement;
+  }
+
+  current = rightNode;
+  while (current) {
+    if (ancestors.has(current)) {
+      return current;
+    }
+    current = current.parentElement;
+  }
+
+  return null;
+};
+
+const getTournamentDateLabel = (dateValue) => {
+  if (!dateValue) {
+    return 'Sin fecha';
+  }
+
+  const date = new Date(`${dateValue}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return 'Sin fecha';
+  }
+
+  return date.toLocaleDateString('es-AR');
+};
+
+const formatInputDate = (dateValue) => {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return date.toISOString().slice(0, 10);
+};
+
+const formatTournamentActiveLabel = (place, dateValue) => {
+  const placeLabel = (place || 'Sede').trim();
+  const dateLabel = getTournamentDateLabel(dateValue).replaceAll('/', '-');
+
+  return `TORNEO EN ${placeLabel.toUpperCase()} ${dateLabel}`;
+};
+
+const syncAdminTwoColumnLayout = () => {};
+
+const syncAdminFormLabels = () => {
+  const playerHeading = playerForm?.closest('.player-form-card')?.querySelector('h3') || playerForm?.parentElement?.querySelector?.('h3');
+  const pairHeading = pairForm?.closest('.pair-form-card')?.querySelector('h3') || pairForm?.parentElement?.querySelector?.('h3');
+
+  if (playerHeading) {
+    playerHeading.textContent = 'Crear Jugador';
+  }
+
+  if (pairHeading) {
+    pairHeading.textContent = 'Crear pareja';
+  }
+
+  const pairSubmit = pairForm?.querySelector('button[type="submit"]');
+  if (pairSubmit) {
+    pairSubmit.textContent = 'Guardar pareja';
+  }
+};
+
+const syncTournamentCreationState = () => {
+  if (!tournamentForm) {
+    return;
+  }
+
+  const state = getState();
+  const activeTournament = hasActiveTournament(state);
+  const tournament = state.tournament || {};
+  const summaryId = 'currentTournamentSummary';
+  let summary = document.getElementById(summaryId);
+
+  if (activeTournament) {
+    const summaryLabel = formatTournamentActiveLabel(tournament.place, tournament.date);
+    const dateLabel = getTournamentDateLabel(tournament.date);
+
+    if (summary) {
+      summary.hidden = false;
+      summary.innerHTML = `
+        <div class="active-tournament-summary-head">
+          <div>
+            <p class="eyebrow">Torneo activo</p>
+            <h3>${escapeHtml(summaryLabel)}</h3>
+            <p class="muted">${escapeHtml(dateLabel)} · ${escapeHtml(formatTournamentMode(tournament.mode))} · ${escapeHtml(tournament.place || 'Sin lugar')}</p>
+          </div>
+        </div>
+        <div class="active-tournament-actions">
+          <button type="button" id="currentTournamentEdit" class="secondary-action">Editar torneo</button>
+          <button type="button" id="currentTournamentDelete" class="danger-action">Borrar torneo</button>
+        </div>
+      `;
+    }
+
+    tournamentForm.hidden = true;
+    tournamentForm.classList.add('is-collapsed');
+  } else {
+    if (summary) {
+      summary.hidden = true;
+      summary.innerHTML = '';
+    }
+
+    tournamentForm.hidden = false;
+    tournamentForm.classList.remove('is-collapsed');
+  }
+
+  const submitButton = tournamentForm.querySelector('button[type="submit"]');
+  if (submitButton) {
+    submitButton.textContent = activeTournament ? 'Guardar torneo' : 'Crear torneo';
+  }
+
+  document.getElementById('currentTournamentEdit')?.addEventListener('click', () => {
+    tournamentForm.hidden = false;
+    tournamentForm.classList.remove('is-collapsed');
+    tournamentForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, { once: true });
+
+  document.getElementById('currentTournamentDelete')?.addEventListener('click', () => {
+    deleteCurrentTournament?.click();
+  }, { once: true });
+
+  syncAdminTwoColumnLayout();
+};
+
+const handleTournamentSubmit = (event) => {
+  event?.preventDefault?.();
+  event?.stopImmediatePropagation?.();
+
+  if (!isAdminUnlocked()) {
+    alert('Desbloqueá el panel de admin primero.');
+    return;
+  }
+
+  const state = getState();
+  const currentTournament = state.tournament || {};
+  const nextDate = tournamentDate?.value || currentTournament.date || formatInputDate(new Date());
+  const nextMode = tournamentMode?.value || currentTournament.mode || 'clasico';
+  const nextPlace = tournamentPlace?.value || currentTournament.place || 'Cancha principal';
+  const nextName = formatTournamentActiveLabel(nextPlace, nextDate);
+
+  const nextTournament = hasActiveTournament(state)
+    ? {
+        ...currentTournament,
+        name: nextName,
+        date: nextDate,
+        mode: nextMode,
+        place: nextPlace,
+      }
+    : {
+        ...defaultState.tournament,
+        name: nextName,
+        date: nextDate,
+        mode: nextMode,
+        place: nextPlace,
+        createdAt: new Date().toISOString(),
+        status: 'Torneo activo',
+        winnerId: null,
+        closedAt: null,
+      };
+
+  setState({
+    ...state,
+    tournament: nextTournament,
+  });
+};
+
+tournamentForm?.addEventListener('submit', handleTournamentSubmit, true);
+window.addEventListener('load', () => {
+  syncTournamentCreationState();
+  syncAdminTwoColumnLayout();
+  syncAdminFormLabels();
+});
+window.createTournamentFromAdmin = handleTournamentSubmit;
 
 const isAdminTabActive = () => document.getElementById('tab-admin')?.classList.contains('is-active');
 
@@ -1115,30 +1339,6 @@ tabButtons.forEach((button) => {
   button.addEventListener('click', () => setActiveTab(button.dataset.tab));
 });
 
-adminLoginForm.addEventListener('submit', (event) => {
-  event.preventDefault();
-
-  const password = adminPassword.value.trim();
-  if (!password) {
-    return;
-  }
-
-  const unlocked = unlockAdmin(password);
-  adminPassword.value = '';
-
-  if (!unlocked) {
-    alert('Contraseña incorrecta.');
-    return;
-  }
-
-  adminLock.hidden = true;
-  adminLock.classList.add('is-hidden');
-  adminContent.hidden = false;
-  adminContent.classList.remove('is-hidden');
-  renderAll();
-  setActiveTab('admin');
-});
-
 pairForm.addEventListener('submit', (event) => {
   event.preventDefault();
 
@@ -1630,7 +1830,7 @@ planTournament.addEventListener('click', () => {
     return;
   }
 
-  const groupCount = pairTotal >= 13 ? 4 : pairTotal >= 9 ? 3 : pairTotal >= 5 ? 2 : 1;
+    const groupCount = pairTotal >= 13 ? 4 : pairTotal >= 9 ? 3 : 2;
   const groups = buildBalancedGroups(state.pairs, groupCount);
   const matches = buildBalancedCrossGroupFixtures(state.pairs, groups, 2);
 
@@ -1726,6 +1926,9 @@ document.addEventListener('keydown', (event) => {
     adminContent.hidden = true;
     adminContent.classList.add('is-hidden');
     renderAll();
+    syncTournamentCreationState();
+    syncAdminTwoColumnLayout();
+    syncAdminFormLabels();
     setActiveTab('admin');
   }
 });

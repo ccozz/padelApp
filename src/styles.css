@@ -1320,3 +1320,111 @@ body.no-active-tournament .tab-torneo .panel {
 body.no-active-tournament .tab-torneo .tournament-details {
   display: block !important;
 }
+/* Tournament admin state */
+.active-tournament-summary {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 13, 28, 0.92);
+}
+
+.active-tournament-summary[hidden],
+#tournamentForm.is-collapsed {
+  display: none !important;
+}
+
+.active-tournament-summary-head {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.active-tournament-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.active-tournament-badges span {
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(18, 26, 48, 0.9);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.active-tournament-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.secondary-action,
+.danger-action {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.7rem 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.secondary-action {
+  background: rgba(122, 162, 255, 0.14);
+  color: var(--text-main);
+}
+
+.danger-action {
+  background: rgba(255, 92, 92, 0.18);
+  color: #ffb6b6;
+}
+
+.admin-two-column-forms {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 960px) {
+  .admin-two-column-forms {
+    grid-template-columns: 1fr;
+  }
+}
+.admin-layout-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.admin-layout-grid .tournament-admin-card {
+  grid-column: 1 / -1;
+}
+
+.admin-layout-grid .pair-form-card,
+.admin-layout-grid .player-form-card {
+  min-width: 0;
+}
+
+.pair-form-card,
+.player-form-card,
+.tournament-admin-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.15rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 13, 28, 0.92);
+}
+
+@media (max-width: 960px) {
+  .admin-layout-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-layout-grid .tournament-admin-card {
+    grid-column: auto;
+  }
+}

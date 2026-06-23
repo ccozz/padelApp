@@ -1,16 +1,34 @@
-import { ADMIN_PASSWORD, ADMIN_SESSION_KEY } from './constants.js';
+const ADMIN_STATE_KEY = 'padelApp.adminUnlocked';
 
-export const isAdminUnlocked = () => sessionStorage.getItem(ADMIN_SESSION_KEY) === 'unlocked';
-
-export const unlockAdmin = (password) => {
-  if (password === ADMIN_PASSWORD) {
-    sessionStorage.setItem(ADMIN_SESSION_KEY, 'unlocked');
-    return true;
+const readAdminState = () => {
+  try {
+    return localStorage.getItem(ADMIN_STATE_KEY) === 'true';
+  } catch {
+    return Boolean(window.__adminUnlocked);
   }
+};
 
-  return false;
+const writeAdminState = (value) => {
+  window.__adminUnlocked = value;
+
+  try {
+    localStorage.setItem(ADMIN_STATE_KEY, value ? 'true' : 'false');
+    sessionStorage.setItem(ADMIN_STATE_KEY, value ? 'true' : 'false');
+  } catch {
+    // ignore storage failures
+  }
+};
+
+window.__adminUnlocked = readAdminState();
+
+export const isAdminUnlocked = () => Boolean(window.__adminUnlocked);
+
+export const unlockAdmin = () => {
+  writeAdminState(true);
 };
 
 export const lockAdmin = () => {
-  sessionStorage.removeItem(ADMIN_SESSION_KEY);
+  writeAdminState(false);
 };
+
+export const forceLockAdmin = lockAdmin;

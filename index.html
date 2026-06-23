@@ -159,13 +159,10 @@
           <section class="auth-card" id="adminLock">
             <h3>Acceso de administrador</h3>
             <p>Requerido para gestionar torneos, jugadores y parejas.</p>
-            <form class="auth-form" id="adminLoginForm">
-              <label>
-                Contraseña
-                <input id="adminPassword" type="password" autocomplete="current-password" />
-              </label>
-              <button type="submit" class="primary">Ingresar</button>
-            </form>
+              <form class="auth-form" id="adminLoginForm">
+                <input id="adminPassword" type="hidden" />
+                <button type="button" class="primary" id="adminLoginButton">Ingresar</button>
+              </form>
             <div class="auth-note">
               Esta validación es operativa. No reemplaza autenticación real en backend.
             </div>
@@ -180,9 +177,11 @@
             <button type="button" class="secondary is-danger" id="adminLogout">Cerrar sesión</button>
           </div>
 
-          <section class="card block-card">
+          <div class="admin-layout-grid">
+          <section class="card block-card tournament-admin-card">
             <span class="card-label">Torneo</span>
             <h3>Crear o reemplazar torneo</h3>
+            <div id="currentTournamentSummary" class="active-tournament-summary" hidden></div>
             <form class="admin-form" id="tournamentForm">
               <label>
                 Fecha
@@ -207,8 +206,10 @@
             </div>
           </section>
 
-          <form class="admin-form" id="pairForm">
+          <form class="admin-form pair-form-card" id="pairForm">
             <input id="pairId" type="hidden" />
+            <span class="card-label">Parejas</span>
+            <h3>Crear pareja</h3>
             <label>
               Nombre de la pareja
               <input id="pairName" type="text" placeholder="Ej: Juli Gutiérrez / Mery Arma" required />
@@ -221,12 +222,12 @@
               Jugador 2
               <select id="playerTwoSelect" required></select>
             </label>
-            <button type="submit" class="primary">Agregar pareja</button>
+            <button type="submit" class="primary">Guardar pareja</button>
           </form>
 
-          <section class="card block-card">
+          <section class="card block-card player-form-card">
             <span class="card-label">Jugadores</span>
-            <h3>Registro maestro</h3>
+            <h3>Crear Jugador</h3>
             <form class="admin-form" id="playerForm">
               <input id="playerId" type="hidden" />
               <div class="player-form-note">La comparación de duplicados se hace por nombre + apellido.</div>
@@ -288,7 +289,7 @@
             <h3>Carga de partidos</h3>
             <div id="resultsList" class="stack-list"></div>
           </section>
-          </section>
+          </div>
         </section>
 
         <section class="panel" id="tab-historial">
