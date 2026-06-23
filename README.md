@@ -16,9 +16,9 @@ Webapp mobile-first para gestión de torneos de padel.
 ### Variables de entorno
 - `PORT`
 - `DB_PATH`
-- `SESSION_SECRET`
 - `ADMIN_USERNAME`
 - `ADMIN_PASSWORD_PLAIN`
+- `SESSION_SECRET` es obligatoria; si falta, el servidor no arranca.
 
 ### Arranque desde cero
 1. Copiar `.env.example` a `.env` y completar valores.

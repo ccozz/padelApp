@@ -3,7 +3,15 @@ import jwt from 'jsonwebtoken';
 
 export const COOKIE_NAME = 'padelApp_session';
 
-const getSessionSecret = () => process.env.SESSION_SECRET || 'dev-session-secret';
+export const getSessionSecret = () => {
+  const sessionSecret = String(process.env.SESSION_SECRET ?? '').trim();
+
+  if (!sessionSecret) {
+    throw new Error('SESSION_SECRET no está configurada');
+  }
+
+  return sessionSecret;
+};
 
 export const hashPassword = (password) => bcrypt.hash(password, 12);
 
@@ -37,4 +45,3 @@ export const requireAdmin = (req, res, next) => {
     res.status(401).json({ error: 'Invalid or expired admin session' });
   }
 };
-
