@@ -5,3 +5,6 @@ build/
 .env.local
 .DS_Store
 Thumbs.db
+
+db/*.sqlite
+db/*.db
