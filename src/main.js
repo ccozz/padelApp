@@ -639,6 +639,7 @@ const renderWinnerSelect = () => {
 const renderGroups = () => {
   const state = getState();
   const pairMap = getPairMap(state.pairs);
+  const players = state.players || [];
   const groupStats = new Map();
 
   state.matches.forEach((match) => {
@@ -688,8 +689,6 @@ const renderGroups = () => {
           return {
             id: pairIdValue,
             name: pair?.name || pairIdValue,
-            playerOneLabel: getPlayerGroupLabel(players.find((player) => player.id === pair.playerOneId)),
-            playerTwoLabel: getPlayerGroupLabel(players.find((player) => player.id === pair.playerTwoId)),
             wins: row.wins || 0,
             losses: row.losses || 0,
             setsDiff: (row.setsFor || 0) - (row.setsAgainst || 0),
@@ -1146,6 +1145,7 @@ const renderAll = () => {
   renderResults();
   renderHistoryDashboard();
   renderAdminState();
+  syncTournamentCreationState();
 };
 
 const renderAdminState = () => {
@@ -1156,6 +1156,9 @@ const renderAdminState = () => {
   adminLock.classList.toggle('is-hidden', unlocked);
   adminContent.hidden = !unlocked;
   adminContent.classList.toggle('is-hidden', !unlocked);
+  if (adminLoginForm) {
+    adminLoginForm.hidden = unlocked;
+  }
 
   [
     pairId,
