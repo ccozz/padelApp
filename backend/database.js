@@ -3,7 +3,8 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 const schemaSql = readFileSync(resolve(process.cwd(), 'db', 'schema.sql'), 'utf8');
-const schemaStatements = schemaSql
+const schemaSqlWithoutComments = schemaSql.replace(/^--.*$/gm, '');
+const schemaStatements = schemaSqlWithoutComments
   .split(';')
   .map((statement) => statement.trim())
   .filter(Boolean);
@@ -296,3 +297,5 @@ export const openDatabase = () => {
     throw new Error(`Database bootstrap failed during openDatabase: ${error.message}`);
   }
 };
+
+
