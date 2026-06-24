@@ -3,6 +3,12 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 const schemaSql = readFileSync(resolve(process.cwd(), 'db', 'schema.sql'), 'utf8');
+const schemaStatements = schemaSql
+  .split(';')
+  .map((statement) => statement.trim())
+  .filter(Boolean);
+const tableSchemaStatements = schemaStatements.filter((statement) => statement.startsWith('CREATE TABLE'));
+const indexSchemaStatements = schemaStatements.filter((statement) => statement.startsWith('CREATE INDEX'));
 
 export const getDatabasePath = () => resolve(process.cwd(), process.env.DB_PATH || './db/padel.sqlite');
 
@@ -15,6 +21,18 @@ const getTableColumns = (db, tableName) => {
   }
 
   return db.prepare(`PRAGMA table_info(${tableName})`).all().map((column) => column.name);
+};
+
+const runSchemaStatements = (db, statements, stepLabel) => {
+  if (!statements.length) {
+    return;
+  }
+
+  try {
+    db.exec(`${statements.join(';\n')};`);
+  } catch (error) {
+    throw new Error(`Database bootstrap failed during ${stepLabel}: ${error.message}`);
+  }
 };
 
 const toIsoIfMissing = (value) => value || new Date().toISOString();
@@ -98,7 +116,7 @@ const migrateLegacyTournamentModel = (db) => {
       DROP TABLE IF EXISTS categories;
     `);
 
-    db.exec(schemaSql);
+    runSchemaStatements(db, tableSchemaStatements, 'recreate migrated tables');
 
     const insertCategory = db.prepare(
       `
@@ -256,10 +274,25 @@ export const openDatabase = () => {
   mkdirSync(dirname(dbPath), { recursive: true });
 
   const db = new DatabaseSync(dbPath);
-  db.exec('PRAGMA foreign_keys = ON');
-  db.exec('PRAGMA journal_mode = WAL');
-  db.exec(schemaSql);
-  migrateLegacyTournamentModel(db);
 
-  return db;
+  try {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.exec('PRAGMA journal_mode = WAL');
+    runSchemaStatements(db, tableSchemaStatements, 'create tables');
+
+    try {
+      migrateLegacyTournamentModel(db);
+    } catch (error) {
+      throw new Error(`Database bootstrap failed during legacy migration: ${error.message}`);
+    }
+
+    runSchemaStatements(db, indexSchemaStatements, 'create indexes');
+    return db;
+  } catch (error) {
+    if (error.message.startsWith('Database bootstrap failed')) {
+      throw error;
+    }
+
+    throw new Error(`Database bootstrap failed during openDatabase: ${error.message}`);
+  }
 };
