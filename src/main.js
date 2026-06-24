@@ -1044,7 +1044,7 @@ const renderBracket = () => {
                       <strong>${escapeHtml(match.pairBLabel)}</strong>
                     </div>
                     <div class="bracket-meta">
-                      ${match.played ? `Ganador: ${state.pairs.find((pair) => pair.id === match.winnerId)?.name || 'Pendiente'}` : 'Ganador avanza a la siguiente fase'}
+                      ${match.played ? `Ganador: ${escapeHtml(state.pairs.find((pair) => pair.id === match.winnerId)?.name || 'Pendiente')}` : 'Ganador avanza a la siguiente fase'}
                     </div>
                   </div>
                 `,
