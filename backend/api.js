@@ -614,17 +614,11 @@ export const createApiRouter = (db) => {
     const groups = buildBalancedGroups(pairs, groupCount);
     const matches = buildBalancedCrossGroupFixtures(pairs, groups, 2);
 
-    const deleteGroupIds = db.prepare('SELECT id FROM groups WHERE tournament_id = ?').all(tournament.id).map((row) => row.id);
-    const deleteMatchIds = db.prepare('SELECT id FROM matches WHERE tournament_id = ?').all(tournament.id).map((row) => row.id);
-
-    const transaction = db.transaction(() => {
-      if (deleteMatchIds.length) {
-        db.prepare(`DELETE FROM matches WHERE tournament_id = ?`).run(tournament.id);
-      }
-
-      if (deleteGroupIds.length) {
-        db.prepare(`DELETE FROM groups WHERE tournament_id = ?`).run(tournament.id);
-      }
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.prepare('DELETE FROM matches WHERE tournament_id = ?').run(tournament.id);
+      db.prepare('DELETE FROM group_pairs WHERE group_id IN (SELECT id FROM groups WHERE tournament_id = ?)').run(tournament.id);
+      db.prepare('DELETE FROM groups WHERE tournament_id = ?').run(tournament.id);
 
       groups.forEach((group) => {
         db.prepare('INSERT INTO groups (id, tournament_id, name) VALUES (?, ?, ?)').run(group.id, tournament.id, group.name);
@@ -662,9 +656,11 @@ export const createApiRouter = (db) => {
       });
 
       db.prepare('UPDATE tournaments SET status = ? WHERE id = ?').run('Torneo planificado', tournament.id);
-    });
-
-    transaction();
+      db.exec('COMMIT');
+    } catch (error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
     jsonOk(res, loadTournamentBundle(db, getTournamentById(db, tournament.id)));
   });
 

@@ -13,6 +13,8 @@ Webapp mobile-first para gestión de torneos de padel.
 
 ## Backend
 
+- Requiere Node 24+; usa `node:sqlite` incorporado, sin dependencias nativas externas.
+
 ### Variables de entorno
 - `PORT`
 - `DB_PATH`

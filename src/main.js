@@ -417,55 +417,11 @@ const syncTournamentCreationState = () => {
   syncAdminTwoColumnLayout();
 };
 
-const handleTournamentSubmit = (event) => {
-  event?.preventDefault?.();
-  event?.stopImmediatePropagation?.();
-
-  if (!isAdminUnlocked()) {
-    alert('Desbloqueá el panel de admin primero.');
-    return;
-  }
-
-  const state = getState();
-  const currentTournament = state.tournament || {};
-  const nextDate = tournamentDate?.value || currentTournament.date || formatInputDate(new Date());
-  const nextMode = tournamentMode?.value || currentTournament.mode || 'clasico';
-  const nextPlace = tournamentPlace?.value || currentTournament.place || 'Cancha principal';
-  const nextName = formatTournamentActiveLabel(nextPlace, nextDate);
-
-  const nextTournament = hasActiveTournament(state)
-    ? {
-        ...currentTournament,
-        name: nextName,
-        date: nextDate,
-        mode: nextMode,
-        place: nextPlace,
-      }
-    : {
-        ...defaultState.tournament,
-        name: nextName,
-        date: nextDate,
-        mode: nextMode,
-        place: nextPlace,
-        createdAt: new Date().toISOString(),
-        status: 'Torneo activo',
-        winnerId: null,
-        closedAt: null,
-      };
-
-  setState({
-    ...state,
-    tournament: nextTournament,
-  });
-};
-
-tournamentForm?.addEventListener('submit', handleTournamentSubmit, true);
 window.addEventListener('load', () => {
   syncTournamentCreationState();
   syncAdminTwoColumnLayout();
   syncAdminFormLabels();
 });
-window.createTournamentFromAdmin = handleTournamentSubmit;
 
 const isAdminTabActive = () => document.getElementById('tab-admin')?.classList.contains('is-active');
 
