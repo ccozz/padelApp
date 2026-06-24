@@ -8,3 +8,5 @@ Thumbs.db
 
 db/*.sqlite
 db/*.db
+db/*.sqlite-wal
+db/*.sqlite-shm

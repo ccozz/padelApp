@@ -1,14 +1,29 @@
 PRAGMA foreign_keys = ON;
 
+-- Compatibilidad: esta tabla conserva el nombre histórico `tournaments`,
+-- pero a partir de este modelo representa el EVENTO.
 CREATE TABLE IF NOT EXISTS tournaments (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   date TEXT NOT NULL,
-  mode TEXT NOT NULL,
-  place TEXT NOT NULL,
-  status TEXT NOT NULL,
-  created_at TEXT NOT NULL,
+  mode TEXT NOT NULL DEFAULT 'clásico',
+  place TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'Evento activo',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   winner_id TEXT,
+  closed_at TEXT,
+  scoring_win INTEGER NOT NULL DEFAULT 1,
+  scoring_loss INTEGER NOT NULL DEFAULT 0,
+  scoring_no_show INTEGER NOT NULL DEFAULT 0,
+  rules_version INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS categories (
+  id TEXT PRIMARY KEY,
+  event_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'Torneo activo',
+  winner_pair_id TEXT,
   closed_at TEXT,
   scoring_win INTEGER NOT NULL DEFAULT 1,
   scoring_loss INTEGER NOT NULL DEFAULT 0,
@@ -20,21 +35,21 @@ CREATE TABLE IF NOT EXISTS players (
   id TEXT PRIMARY KEY,
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL,
-  nickname TEXT,
+  nickname TEXT NOT NULL DEFAULT '',
   full_name TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS pairs (
   id TEXT PRIMARY KEY,
-  tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+  category_id TEXT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  player_one_id TEXT NOT NULL REFERENCES players(id) ON DELETE RESTRICT,
-  player_two_id TEXT NOT NULL REFERENCES players(id) ON DELETE RESTRICT
+  player_one_id TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  player_two_id TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS groups (
   id TEXT PRIMARY KEY,
-  tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+  category_id TEXT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
   name TEXT NOT NULL
 );
 
@@ -46,7 +61,7 @@ CREATE TABLE IF NOT EXISTS group_pairs (
 
 CREATE TABLE IF NOT EXISTS matches (
   id TEXT PRIMARY KEY,
-  tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+  category_id TEXT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
   stage TEXT NOT NULL,
   pair_a_id TEXT NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
   pair_b_id TEXT NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
@@ -65,7 +80,8 @@ CREATE TABLE IF NOT EXISTS matches (
 
 CREATE TABLE IF NOT EXISTS history (
   id TEXT PRIMARY KEY,
-  tournament_id TEXT NOT NULL,
+  event_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+  category_id TEXT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
   archived_at TEXT NOT NULL,
   snapshot_json TEXT NOT NULL
 );
@@ -76,9 +92,9 @@ CREATE TABLE IF NOT EXISTS admins (
   password_hash TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_tournaments_status_created ON tournaments(status, created_at);
-CREATE INDEX IF NOT EXISTS idx_pairs_tournament ON pairs(tournament_id);
-CREATE INDEX IF NOT EXISTS idx_groups_tournament ON groups(tournament_id);
-CREATE INDEX IF NOT EXISTS idx_matches_tournament ON matches(tournament_id);
-CREATE INDEX IF NOT EXISTS idx_history_tournament ON history(tournament_id);
-
+CREATE INDEX IF NOT EXISTS idx_categories_event_id ON categories(event_id);
+CREATE INDEX IF NOT EXISTS idx_pairs_category_id ON pairs(category_id);
+CREATE INDEX IF NOT EXISTS idx_groups_category_id ON groups(category_id);
+CREATE INDEX IF NOT EXISTS idx_matches_category_id ON matches(category_id);
+CREATE INDEX IF NOT EXISTS idx_history_event_id ON history(event_id);
+CREATE INDEX IF NOT EXISTS idx_history_category_id ON history(category_id);
