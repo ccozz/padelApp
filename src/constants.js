@@ -1,7 +1,3 @@
-export const STORAGE_KEY = 'padelApp.state';
-export const ADMIN_SESSION_KEY = 'padelApp.adminSession';
-export const ADMIN_PASSWORD = 'padel2026';
-
 export const defaultState = () => ({
   tournament: {
     name: 'Torneo de padel',

@@ -1,6 +1,22 @@
 import { defaultState, rules } from './constants.js';
-import { forceLockAdmin, isAdminUnlocked, lockAdmin, unlockAdmin } from './auth.js';
-import { createId, loadState, normalizeText, saveState } from './storage.js';
+import { forceLockAdmin, isAdminUnlocked, lockAdmin, syncAdminSession, unlockAdmin } from './auth.js';
+import {
+  archiveTournament as archiveTournamentApi,
+  createId,
+  createPair as createPairApi,
+  createPlayer as createPlayerApi,
+  createTournament as createTournamentApi,
+  deletePair as deletePairApi,
+  deletePlayer as deletePlayerApi,
+  deleteTournament as deleteTournamentApi,
+  loadState,
+  normalizeText,
+  planTournament as planTournamentApi,
+  updateMatch as updateMatchApi,
+  updatePair as updatePairApi,
+  updatePlayer as updatePlayerApi,
+  updateTournament as updateTournamentApi,
+} from './storage.js';
 import {
   buildBalancedCrossGroupFixtures,
   buildBalancedGroups,
@@ -70,41 +86,120 @@ const adminContent = document.getElementById('adminContent');
 const adminLoginForm = document.getElementById('adminLoginForm');
 const adminLoginButton = document.getElementById('adminLoginButton');
 const adminPassword = document.getElementById('adminPassword');
+const adminUsername = document.getElementById('adminUsername');
+const adminLoginError = document.getElementById('adminLoginError');
+const appError = document.getElementById('appError');
 const adminLogout = document.getElementById('adminLogout');
 const adminTab = [...tabButtons].find((button) => button.dataset.tab === 'admin');
 
-window.adminLoginSubmit = (event) => {
+let appState = defaultState();
+
+const setAppError = (message = '') => {
+  if (!appError) {
+    return;
+  }
+
+  if (!message) {
+    appError.hidden = true;
+    appError.textContent = '';
+    return;
+  }
+
+  appError.hidden = false;
+  appError.textContent = message;
+};
+
+const setFormBusy = (form, busy) => {
+  if (!form) {
+    return;
+  }
+
+  form.querySelectorAll('button[type="submit"]').forEach((button) => {
+    button.disabled = busy;
+  });
+};
+
+const withButtonBusy = async (button, task) => {
+  if (button) {
+    button.disabled = true;
+  }
+
+  try {
+    return await task();
+  } finally {
+    if (button) {
+      button.disabled = false;
+    }
+  }
+};
+
+window.adminLoginSubmit = async (event) => {
   event?.preventDefault?.();
   event?.stopImmediatePropagation?.();
-  unlockAdmin();
-  if (adminPassword) {
-    adminPassword.value = '';
+
+  if (adminLoginError) {
+    adminLoginError.hidden = true;
+    adminLoginError.textContent = '';
   }
-  if (adminLock) {
-    adminLock.hidden = true;
+
+  const username = normalizeText(adminUsername?.value || '');
+  const password = String(adminPassword?.value || '');
+  const submitButton = adminLoginForm?.querySelector('button[type="submit"], button[type="button"]');
+
+  if (!username || !password) {
+    if (adminLoginError) {
+      adminLoginError.hidden = false;
+      adminLoginError.textContent = 'Ingresá usuario y contraseña.';
+    }
+    return false;
   }
-  if (adminContent) {
-    adminContent.hidden = false;
+
+  if (submitButton) {
+    submitButton.disabled = true;
   }
-  if (adminTab) {
-    adminTab.classList.add('is-active');
+
+  try {
+    await unlockAdmin(username, password);
+    if (adminPassword) {
+      adminPassword.value = '';
+    }
+    if (adminLock) {
+      adminLock.hidden = true;
+    }
+    if (adminContent) {
+      adminContent.hidden = false;
+    }
+    if (adminTab) {
+      adminTab.classList.add('is-active');
+    }
+    setAppError('');
+    renderAll();
+    syncTournamentCreationState();
+    syncAdminTwoColumnLayout();
+    syncAdminFormLabels();
+    setActiveTab('admin');
+  } catch (error) {
+    if (adminLoginError) {
+      adminLoginError.hidden = false;
+      adminLoginError.textContent = error?.status === 401 ? 'Credenciales inválidas.' : error?.message || 'No se pudo iniciar sesión.';
+    }
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+    }
   }
-  renderAll();
-  syncTournamentCreationState();
-  syncAdminTwoColumnLayout();
-  syncAdminFormLabels();
-  setActiveTab('admin');
+
   return false;
 };
 
-adminLoginButton?.addEventListener('click', window.adminLoginSubmit, true);
+adminLoginForm?.addEventListener('submit', window.adminLoginSubmit, true);
 
 adminLogout?.addEventListener(
   'click',
-  (event) => {
+  async (event) => {
     event.preventDefault();
     event.stopImmediatePropagation();
-    forceLockAdmin();
+    await lockAdmin();
     if (adminLock) {
       adminLock.hidden = false;
     }
@@ -112,11 +207,12 @@ adminLogout?.addEventListener(
       adminContent.hidden = true;
     }
     renderAll();
+    setActiveTab('admin');
   },
   true,
 );
 
-const getState = () => loadState();
+const getState = () => appState;
 
 const rebuildDerivedState = (state) => {
   const standings = buildStandings(state.pairs, state.matches);
@@ -133,7 +229,12 @@ const rebuildDerivedState = (state) => {
 };
 
 const setState = (nextState) => {
-  saveState(rebuildDerivedState(nextState));
+  appState = rebuildDerivedState(nextState);
+  renderAll();
+};
+
+const refreshState = async () => {
+  appState = rebuildDerivedState(await loadState());
   renderAll();
 };
 
@@ -479,7 +580,7 @@ const renderPlayerOptions = () => {
   const options =
     '<option value="">Seleccionar jugador</option>' +
     players
-      .map((player) => `<option value="${player.id}">${getPlayerDisplayName(player)}</option>`)
+      .map((player) => `<option value="${escapeHtml(player.id)}">${escapeHtml(getPlayerDisplayName(player))}</option>`)
       .join('');
 
   if (playerOneSelect) {
@@ -510,12 +611,12 @@ const renderPlayers = () => {
       (player) => `
         <article class="pair-item">
           <div>
-            <strong>${getPlayerDisplayName(player)}</strong>
-            <div class="pair-meta">${player.firstName} ${player.lastName}</div>
+            <strong>${escapeHtml(getPlayerDisplayName(player))}</strong>
+            <div class="pair-meta">${escapeHtml([player.firstName, player.lastName].filter(Boolean).join(' '))}</div>
           </div>
           <div class="pair-actions">
-            <button type="button" class="mini-action" data-player-action="edit" data-player-id="${player.id}">Editar</button>
-            <button type="button" class="mini-action is-danger" data-player-action="delete" data-player-id="${player.id}">Borrar</button>
+            <button type="button" class="mini-action" data-player-action="edit" data-player-id="${escapeHtml(player.id)}">Editar</button>
+            <button type="button" class="mini-action is-danger" data-player-action="delete" data-player-id="${escapeHtml(player.id)}">Borrar</button>
           </div>
         </article>
       `,
@@ -542,13 +643,13 @@ const renderPairs = () => {
       (pair, index) => `
         <article class="pair-item">
           <div>
-            <strong>${pair.name}</strong>
-            <div class="pair-meta">${getPlayerDisplayName(players.find((player) => player.id === pair.playerOneId))} / ${getPlayerDisplayName(players.find((player) => player.id === pair.playerTwoId))}</div>
+            <strong>${escapeHtml(pair.name)}</strong>
+            <div class="pair-meta">${escapeHtml(getPlayerDisplayName(players.find((player) => player.id === pair.playerOneId)))} / ${escapeHtml(getPlayerDisplayName(players.find((player) => player.id === pair.playerTwoId)))}</div>
           </div>
           ${unlocked ? `
             <div class="pair-actions">
-              <button type="button" class="mini-action" data-action="edit" data-id="${pair.id}" ${locked ? 'disabled' : ''}>Editar</button>
-              <button type="button" class="mini-action is-danger" data-action="delete" data-id="${pair.id}" ${locked ? 'disabled' : ''}>Borrar</button>
+              <button type="button" class="mini-action" data-action="edit" data-id="${escapeHtml(pair.id)}" ${locked ? 'disabled' : ''}>Editar</button>
+              <button type="button" class="mini-action is-danger" data-action="delete" data-id="${escapeHtml(pair.id)}" ${locked ? 'disabled' : ''}>Borrar</button>
             </div>
           ` : ''}
         </article>
@@ -564,8 +665,8 @@ const renderWinnerSelect = () => {
   const players = state.players || [];
   const options = pairs
     .map((pair) => {
-      const label = `${pair.name} (${getPlayerName(players, pair.playerOneId, pair.playerOne)} / ${getPlayerName(players, pair.playerTwoId, pair.playerTwo)})`;
-      return `<option value="${pair.id}" ${state.tournament.winnerId === pair.id ? 'selected' : ''}>${label}</option>`;
+      const label = `${escapeHtml(pair.name)} (${escapeHtml(getPlayerName(players, pair.playerOneId, pair.playerOne))} / ${escapeHtml(getPlayerName(players, pair.playerTwoId, pair.playerTwo))})`;
+      return `<option value="${escapeHtml(pair.id)}" ${state.tournament.winnerId === pair.id ? 'selected' : ''}>${label}</option>`;
     })
     .join('');
 
@@ -643,8 +744,8 @@ const renderGroups = () => {
 
       return `
         <article class="group-block">
-          <div class="group-title">${group.name}</div>
-          <div class="group-meta">${row.playerOneLabel} / ${row.playerTwoLabel}</div>
+          <div class="group-title">${escapeHtml(group.name)}</div>
+          <div class="group-meta">${rows.length} parejas</div>
           <div class="group-table-wrap">
             <table class="group-table">
               <colgroup>
@@ -668,7 +769,7 @@ const renderGroups = () => {
                   .map(
                     (row) => `
                       <tr>
-                        <td>${row.name}</td>
+                        <td>${escapeHtml(row.name)}</td>
                         <td>${row.wins}</td>
                         <td>${row.losses}</td>
                         <td>${row.setsDiff}</td>
@@ -773,27 +874,27 @@ const renderMatches = () => {
                 (match, index) => `
                   <article class="match-block">
                     <div class="match-title">Partido ${index + 1}</div>
-                    <div class="match-meta">${match.pairALabel} vs ${match.pairBLabel}</div>
+                    <div class="match-meta">${escapeHtml(match.pairALabel)} vs ${escapeHtml(match.pairBLabel)}</div>
                     <div class="match-meta">
                       Estado: ${match.played ? 'Jugado' : 'Pendiente'}
                       ${match.played ? ` · Score ${match.setsA}-${match.setsB} / ${match.gamesA}-${match.gamesB}` : ''}
                     </div>
                     <div class="match-meta">
-                      ${match.time || match.venue ? `${match.time || 'Sin hora'} · ${match.venue || 'Sin lugar'}` : 'Sin agenda asignada'}
+                      ${match.time || match.venue ? `${escapeHtml(match.time || 'Sin hora')} · ${escapeHtml(match.venue || 'Sin lugar')}` : 'Sin agenda asignada'}
                     </div>
                     ${canEditTournament() ? `
                       <form class="match-agenda-form" data-agenda-match-id="${match.id}">
                         <label>
                           Día
-                          <input name="date" type="date" value="${match.date || ''}" />
+                          <input name="date" type="date" value="${escapeHtml(match.date || '')}" />
                         </label>
                         <label>
                           Hora
-                          <input name="time" type="time" value="${match.time || ''}" />
+                          <input name="time" type="time" value="${escapeHtml(match.time || '')}" />
                         </label>
                         <label>
                           Lugar
-                          <input name="venue" type="text" value="${match.venue || ''}" placeholder="Sede o cancha" />
+                          <input name="venue" type="text" value="${escapeHtml(match.venue || '')}" placeholder="Sede o cancha" />
                         </label>
                         <button type="submit" class="secondary">Guardar agenda</button>
                       </form>
@@ -846,7 +947,7 @@ const renderStandings = () => {
             .map(
               (row, index) => `
                 <tr class="${index < 8 ? 'standings-qualified' : ''}">
-                  <td>${index + 1}. ${row.name}</td>
+                  <td>${index + 1}. ${escapeHtml(row.name)}</td>
                   <td>${row.matchesPlayed}</td>
                   <td class="standings-points-cell">${row.points}</td>
                   <td>${row.setsFor}-${row.setsAgainst}</td>
@@ -895,7 +996,7 @@ const renderPodium = () => {
       (row, index) => `
         <article class="podium-item ${podiumMeta[index].className}">
           <div class="podium-rank">${podiumMeta[index].label}</div>
-          <div class="podium-name">${row.name}</div>
+          <div class="podium-name">${escapeHtml(row.name)}</div>
           <div class="podium-meta">
             Pts: ${row.points} · PJ: ${row.matchesPlayed} · Prom: ${(row.points / Math.max(row.matchesPlayed, 1)).toFixed(2)}
           </div>
@@ -925,7 +1026,7 @@ const renderBracket = () => {
       (round, index) => `
         <article class="bracket-round">
           <div class="bracket-header">
-            <div class="bracket-title">${round.name}</div>
+            <div class="bracket-title">${escapeHtml(round.name)}</div>
             <div class="bracket-step">Fase ${index + 1}</div>
           </div>
           <div class="bracket-track">
@@ -938,9 +1039,9 @@ const renderBracket = () => {
                       <span class="bracket-state">${match.ready ? (match.played ? 'Jugado' : 'Listo') : 'Pendiente'}</span>
                     </div>
                     <div class="bracket-teams">
-                      <strong>${match.pairALabel}</strong>
+                      <strong>${escapeHtml(match.pairALabel)}</strong>
                       <span>vs</span>
-                      <strong>${match.pairBLabel}</strong>
+                      <strong>${escapeHtml(match.pairBLabel)}</strong>
                     </div>
                     <div class="bracket-meta">
                       ${match.played ? `Ganador: ${state.pairs.find((pair) => pair.id === match.winnerId)?.name || 'Pendiente'}` : 'Ganador avanza a la siguiente fase'}
@@ -957,7 +1058,7 @@ const renderBracket = () => {
     `
       <article class="bracket-champion">
         <div class="bracket-champion-label">Campeón</div>
-        <div class="bracket-champion-name">${champion}</div>
+        <div class="bracket-champion-name">${escapeHtml(champion)}</div>
         <div class="bracket-champion-meta">
           ${isTournamentFinalized() ? 'Torneo cerrado y archivado' : 'Pendiente de declaración'}
         </div>
@@ -986,15 +1087,15 @@ const renderBracketResults = () => {
             <div class="bracket-state">${match.played ? 'Jugado' : 'Pendiente'}</div>
           </div>
           <div class="bracket-result-team">
-            <strong>${match.pairALabel}</strong>
-            <strong>${match.pairBLabel}</strong>
+            <strong>${escapeHtml(match.pairALabel)}</strong>
+            <strong>${escapeHtml(match.pairBLabel)}</strong>
           </div>
           <label>
             Ganador
             <select data-bracket-match-id="${match.id}" ${match.ready && !locked ? '' : 'disabled'}>
               <option value="">Seleccionar</option>
-              <option value="${match.pairAId}" ${(state.bracketResults || []).find((result) => result.matchId === match.id)?.winnerId === match.pairAId ? 'selected' : ''}>${match.pairALabel}</option>
-              <option value="${match.pairBId}" ${(state.bracketResults || []).find((result) => result.matchId === match.id)?.winnerId === match.pairBId ? 'selected' : ''}>${match.pairBLabel}</option>
+              <option value="${escapeHtml(match.pairAId)}" ${(state.bracketResults || []).find((result) => result.matchId === match.id)?.winnerId === match.pairAId ? 'selected' : ''}>${escapeHtml(match.pairALabel)}</option>
+              <option value="${escapeHtml(match.pairBId)}" ${(state.bracketResults || []).find((result) => result.matchId === match.id)?.winnerId === match.pairBId ? 'selected' : ''}>${escapeHtml(match.pairBLabel)}</option>
             </select>
           </label>
         </article>
@@ -1017,44 +1118,44 @@ const renderResults = () => {
       (match, index) => `
         <article class="result-block">
           <div class="match-title">Partido ${index + 1}</div>
-          <div class="match-meta">${match.pairALabel} vs ${match.pairBLabel}</div>
+          <div class="match-meta">${escapeHtml(match.pairALabel)} vs ${escapeHtml(match.pairBLabel)}</div>
           <form class="result-form" data-match-id="${match.id}">
             <div class="result-grid">
               <label>
                 Ganador
                 <select name="winnerId" ${locked ? 'disabled' : ''}>
                   <option value="">Definir por score</option>
-                  <option value="${match.pairAId}" ${match.winnerId === match.pairAId ? 'selected' : ''}>${match.pairALabel}</option>
-                  <option value="${match.pairBId}" ${match.winnerId === match.pairBId ? 'selected' : ''}>${match.pairBLabel}</option>
+                  <option value="${escapeHtml(match.pairAId)}" ${match.winnerId === match.pairAId ? 'selected' : ''}>${escapeHtml(match.pairALabel)}</option>
+                  <option value="${escapeHtml(match.pairBId)}" ${match.winnerId === match.pairBId ? 'selected' : ''}>${escapeHtml(match.pairBLabel)}</option>
                 </select>
               </label>
               <label>
-                Sets ${match.pairALabel}
+                Sets ${escapeHtml(match.pairALabel)}
                 <input name="setsA" type="number" min="0" value="${match.setsA ?? ''}" ${locked ? 'disabled' : ''} />
               </label>
               <label>
-                Sets ${match.pairBLabel}
+                Sets ${escapeHtml(match.pairBLabel)}
                 <input name="setsB" type="number" min="0" value="${match.setsB ?? ''}" ${locked ? 'disabled' : ''} />
               </label>
               <label>
-                Games ${match.pairALabel}
+                Games ${escapeHtml(match.pairALabel)}
                 <input name="gamesA" type="number" min="0" value="${match.gamesA ?? ''}" ${locked ? 'disabled' : ''} />
               </label>
               <label>
-                Games ${match.pairBLabel}
+                Games ${escapeHtml(match.pairBLabel)}
                 <input name="gamesB" type="number" min="0" value="${match.gamesB ?? ''}" ${locked ? 'disabled' : ''} />
               </label>
               <label>
                 Día
-                <input name="date" type="date" value="${match.date || ''}" ${locked ? 'disabled' : ''} />
+                <input name="date" type="date" value="${escapeHtml(match.date || '')}" ${locked ? 'disabled' : ''} />
               </label>
               <label>
                 Hora
-                <input name="time" type="time" value="${match.time || ''}" ${locked ? 'disabled' : ''} />
+                <input name="time" type="time" value="${escapeHtml(match.time || '')}" ${locked ? 'disabled' : ''} />
               </label>
               <label>
                 Lugar
-                <input name="venue" type="text" value="${match.venue || ''}" placeholder="Sede o cancha" ${locked ? 'disabled' : ''} />
+                <input name="venue" type="text" value="${escapeHtml(match.venue || '')}" placeholder="Sede o cancha" ${locked ? 'disabled' : ''} />
               </label>
             </div>
             <div class="result-actions">
@@ -1200,103 +1301,113 @@ const startEditPlayer = (id) => {
   setActiveTab('admin');
 };
 
-const deletePair = (id) => {
-  const state = getState();
-  const nextPairs = state.pairs.filter((entry) => entry.id !== id);
-  setState({
-    ...state,
-    pairs: nextPairs,
-  });
+const handleApiError = async (error, fallbackMessage = 'No se pudo completar la acción.') => {
+  if (error?.status === 401) {
+    await lockAdmin();
+    if (adminLock) {
+      adminLock.hidden = false;
+      adminLock.classList.remove('is-hidden');
+    }
+    if (adminContent) {
+      adminContent.hidden = true;
+      adminContent.classList.add('is-hidden');
+    }
+    setAppError('La sesión de administrador expiró.');
+    renderAll();
+    setActiveTab('admin');
+    return;
+  }
+
+  setAppError(error?.message || fallbackMessage);
 };
 
-const deletePlayer = (id) => {
+const deletePair = async (id) => {
+  try {
+    await deletePairApi(id);
+    await refreshState();
+  } catch (error) {
+    await handleApiError(error, 'No se pudo borrar la pareja.');
+  }
+};
+
+const deletePlayer = async (id) => {
   const state = getState();
   const usedInPairs = state.pairs.some((pair) => pair.playerOneId === id || pair.playerTwoId === id);
 
   if (usedInPairs) {
-    alert('No se puede borrar un jugador que ya está usado en una pareja.');
+    setAppError('No se puede borrar un jugador que ya está usado en una pareja.');
     return;
   }
 
-  setState({
-    ...state,
-    players: state.players.filter((player) => player.id !== id),
-  });
+  try {
+    await deletePlayerApi(id);
+    await refreshState();
+  } catch (error) {
+    await handleApiError(error, 'No se pudo borrar el jugador.');
+  }
 };
 
-const createNewTournament = ({ date, mode, place }) => {
+const createNewTournament = async ({ date, mode, place }) => {
   const state = getState();
 
   if (hasActiveTournament(state)) {
-    alert('Primero completá o eliminá el torneo actual.');
+    setAppError('Primero completá o eliminá el torneo actual.');
     return;
   }
 
-  setState({
-    ...state,
-    tournament: {
-      ...defaultState().tournament,
-      name: 'Torneo de padel',
+  try {
+    await createTournamentApi({
       date,
       mode,
       place,
-      createdAt: new Date().toISOString(),
-      status: 'Torneo activo',
-    },
-    pairs: [],
-    groups: [],
-    matches: [],
-    standings: [],
-    bracket: [],
-    bracketResults: [],
-    bracketChampion: null,
-  });
+    });
+    await refreshState();
+  } catch (error) {
+    await handleApiError(error, 'No se pudo crear el torneo.');
+  }
 };
 
-const deleteCurrentTournamentState = () => {
+const deleteCurrentTournamentState = async () => {
   const state = getState();
+  const tournamentId = state?.tournament?.id;
 
-  setState({
-    ...state,
-    tournament: {
-      ...defaultState().tournament,
-    },
-    pairs: [],
-    groups: [],
-    matches: [],
-    standings: [],
-    bracket: [],
-    bracketResults: [],
-    bracketChampion: null,
-  });
+  if (!tournamentId) {
+    return;
+  }
+
+  try {
+    await deleteTournamentApi(tournamentId);
+    appState = defaultState();
+    await refreshState();
+  } catch (error) {
+    await handleApiError(error, 'No se pudo eliminar el torneo actual.');
+  }
 };
 
-const updateMatch = (matchId, updater) => {
+const updateMatch = async (matchId, updater) => {
   if (!canEditTournament()) {
     return;
   }
 
   const state = getState();
-  const nextMatches = state.matches.map((match) => {
-    if (match.id !== matchId) {
-      return match;
-    }
+  const match = state.matches.find((entry) => entry.id === matchId);
+  if (!match) {
+    setAppError('No se encontró el partido.');
+    return;
+  }
 
-    return updater(match);
-  });
+  const nextMatch = updater(match);
 
-  setState({
-    ...state,
-    matches: nextMatches,
-    tournament: {
-      ...state.tournament,
-      status: 'Resultados actualizados',
-    },
-  });
+  try {
+    await updateMatchApi(matchId, nextMatch);
+    await refreshState();
+  } catch (error) {
+    await handleApiError(error, 'No se pudo actualizar el partido.');
+  }
 };
 
-const updateMatchAgenda = (matchId, agenda) => {
-  updateMatch(matchId, (match) => ({
+const updateMatchAgenda = async (matchId, agenda) => {
+  await updateMatch(matchId, (match) => ({
     ...match,
     date: agenda.date,
     time: agenda.time,
@@ -1313,12 +1424,12 @@ const parseNumber = (value) => {
   return Number.isNaN(parsedValue) ? null : parsedValue;
 };
 
-const applyNoShow = (matchId, winnerSide) => {
+const applyNoShow = async (matchId, winnerSide) => {
   if (!canEditTournament()) {
     return;
   }
 
-  updateMatch(matchId, (match) => {
+  await updateMatch(matchId, (match) => {
     const winnerId = winnerSide === 'A' ? match.pairAId : match.pairBId;
     const loserId = winnerSide === 'A' ? match.pairBId : match.pairAId;
 
@@ -1339,17 +1450,17 @@ tabButtons.forEach((button) => {
   button.addEventListener('click', () => setActiveTab(button.dataset.tab));
 });
 
-pairForm.addEventListener('submit', (event) => {
+pairForm.addEventListener('submit', async (event) => {
   event.preventDefault();
 
   if (!canEditTournament()) {
-    alert('Acceso denegado.');
+    setAppError('Acceso denegado.');
     return;
   }
 
   const state = getState();
   if (!hasActiveTournament(state)) {
-    alert('Creá un torneo antes de agregar parejas.');
+    setAppError('Creá un torneo antes de agregar parejas.');
     return;
   }
 
@@ -1359,12 +1470,12 @@ pairForm.addEventListener('submit', (event) => {
   const editingId = pairId.value.trim();
 
   if (!name || !firstPlayerId || !secondPlayerId) {
-    alert('Completa nombre de pareja y seleccioná dos jugadores.');
+    setAppError('Completa nombre de pareja y seleccioná dos jugadores.');
     return;
   }
 
   if (firstPlayerId === secondPlayerId) {
-    alert('Una pareja no puede usar el mismo jugador dos veces.');
+    setAppError('Una pareja no puede usar el mismo jugador dos veces.');
     return;
   }
 
@@ -1373,41 +1484,39 @@ pairForm.addEventListener('submit', (event) => {
   const secondPlayer = getPlayerName(players, secondPlayerId);
 
   if (!firstPlayer || !secondPlayer) {
-    alert('Seleccioná jugadores válidos.');
+    setAppError('Seleccioná jugadores válidos.');
     return;
   }
 
-  const nextPair = {
-    id: editingId || createId(),
+  const payload = {
     name,
     playerOneId: firstPlayerId,
     playerTwoId: secondPlayerId,
-    playerOne: firstPlayer,
-    playerTwo: secondPlayer,
-    createdAt: editingId
-      ? state.pairs.find((entry) => entry.id === editingId)?.createdAt || new Date().toISOString()
-      : new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
   };
 
-  const nextPairs = editingId
-    ? state.pairs.map((entry) => (entry.id === editingId ? nextPair : entry))
-    : [nextPair, ...state.pairs];
-
-  setState({
-    ...state,
-    pairs: nextPairs,
-  });
-
-  resetForm();
-  setActiveTab('parejas');
+  try {
+    setFormBusy(pairForm, true);
+    setAppError('');
+    if (editingId) {
+      await updatePairApi(editingId, payload);
+    } else {
+      await createPairApi(payload);
+    }
+    await refreshState();
+    resetForm();
+    setActiveTab('parejas');
+  } catch (error) {
+    await handleApiError(error, editingId ? 'No se pudo actualizar la pareja.' : 'No se pudo crear la pareja.');
+  } finally {
+    setFormBusy(pairForm, false);
+  }
 });
 
-playerForm.addEventListener('submit', (event) => {
+playerForm.addEventListener('submit', async (event) => {
   event.preventDefault();
 
   if (!isAdminUnlocked()) {
-    alert('Acceso denegado.');
+    setAppError('Acceso denegado.');
     return;
   }
 
@@ -1418,6 +1527,7 @@ playerForm.addEventListener('submit', (event) => {
   const editingId = playerId.value.trim();
 
   if (!firstName || !lastName) {
+    setAppError('Completá nombre y apellido.');
     return;
   }
 
@@ -1429,33 +1539,34 @@ playerForm.addEventListener('submit', (event) => {
   );
 
   if (duplicatePlayer) {
-    alert('Ya existe un jugador con ese nombre.');
+    setAppError('Ya existe un jugador con ese nombre.');
     return;
   }
 
-  const nextPlayer = {
-    id: editingId || createId(),
+  const payload = {
     firstName,
     lastName,
     nickname: alias,
-    fullName: [firstName, lastName].join(' ').trim(),
-    createdAt: editingId ? state.players.find((player) => player.id === editingId)?.createdAt || new Date().toISOString() : new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
   };
 
-  const nextPlayers = editingId
-    ? state.players.map((player) => (player.id === editingId ? nextPlayer : player))
-    : [...state.players, nextPlayer];
-
-  setState({
-    ...state,
-    players: nextPlayers,
-  });
-
-  resetPlayerForm();
+  try {
+    setFormBusy(playerForm, true);
+    setAppError('');
+    if (editingId) {
+      await updatePlayerApi(editingId, payload);
+    } else {
+      await createPlayerApi(payload);
+    }
+    await refreshState();
+    resetPlayerForm();
+  } catch (error) {
+    await handleApiError(error, editingId ? 'No se pudo actualizar el jugador.' : 'No se pudo crear el jugador.');
+  } finally {
+    setFormBusy(playerForm, false);
+  }
 });
 
-playersList.addEventListener('click', (event) => {
+playersList.addEventListener('click', async (event) => {
   if (!isAdminUnlocked()) {
     return;
   }
@@ -1472,28 +1583,35 @@ playersList.addEventListener('click', (event) => {
   }
 
   if (playerAction === 'delete') {
-    deletePlayer(targetPlayerId);
+    await deletePlayer(targetPlayerId);
     if (playerId.value === targetPlayerId) {
       resetPlayerForm();
     }
   }
 });
 
-tournamentForm.addEventListener('submit', (event) => {
+tournamentForm.addEventListener('submit', async (event) => {
   event.preventDefault();
 
   if (!isAdminUnlocked()) {
     return;
   }
 
-  createNewTournament({
-    date: tournamentDate.value,
-    mode: tournamentMode.value,
-    place: normalizeText(tournamentPlace.value),
-  });
+  try {
+    setFormBusy(tournamentForm, true);
+    setAppError('');
+    await createNewTournament({
+      date: tournamentDate.value,
+      mode: tournamentMode.value,
+      place: normalizeText(tournamentPlace.value),
+    });
+    setActiveTab('torneo');
+  } finally {
+    setFormBusy(tournamentForm, false);
+  }
 });
 
-deleteCurrentTournament.addEventListener('click', () => {
+deleteCurrentTournament.addEventListener('click', async () => {
   if (!isAdminUnlocked()) {
     return;
   }
@@ -1502,15 +1620,15 @@ deleteCurrentTournament.addEventListener('click', () => {
     return;
   }
 
-  deleteCurrentTournamentState();
+  await deleteCurrentTournamentState();
   resetForm();
   resetPlayerForm();
 });
 
-pairsList.addEventListener('click', (event) => {
+pairsList.addEventListener('click', async (event) => {
   if (!canEditTournament()) {
     if (isAdminUnlocked()) {
-      alert('El torneo está cerrado.');
+      setAppError('El torneo está cerrado.');
     }
     return;
   }
@@ -1532,14 +1650,14 @@ pairsList.addEventListener('click', (event) => {
   }
 
   if (action === 'delete') {
-    deletePair(id);
+    await deletePair(id);
     if (pairId.value === id) {
       resetForm();
     }
   }
 });
 
-resultsList.addEventListener('click', (event) => {
+resultsList.addEventListener('click', async (event) => {
   if (!canEditTournament()) {
     return;
   }
@@ -1557,15 +1675,15 @@ resultsList.addEventListener('click', (event) => {
   const { action, matchId } = button.dataset;
 
   if (action === 'noshow-a') {
-    applyNoShow(matchId, 'A');
+    await withButtonBusy(button, () => applyNoShow(matchId, 'A'));
   }
 
   if (action === 'noshow-b') {
-    applyNoShow(matchId, 'B');
+    await withButtonBusy(button, () => applyNoShow(matchId, 'B'));
   }
 });
 
-resultsList.addEventListener('submit', (event) => {
+resultsList.addEventListener('submit', async (event) => {
   if (!canEditTournament()) {
     return;
   }
@@ -1595,12 +1713,12 @@ resultsList.addEventListener('submit', (event) => {
   const venue = normalizeText(formData.get('venue') || '');
 
   if (setsA === null || setsB === null || gamesA === null || gamesB === null) {
-    alert('Completa sets y games para guardar el resultado.');
+    setAppError('Completa sets y games para guardar el resultado.');
     return;
   }
 
   if (!match) {
-    alert('No se encontró el partido.');
+    setAppError('No se encontró el partido.');
     return;
   }
 
@@ -1612,36 +1730,42 @@ resultsList.addEventListener('submit', (event) => {
   }
 
   if (!resolvedWinnerId) {
-    alert('El score no define ganador. Ajustá sets o games, o elegí el ganador manualmente.');
+    setAppError('El score no define ganador. Ajustá sets o games, o elegí el ganador manualmente.');
     return;
   }
 
   if (winnerId && scoreWinnerId && winnerId !== scoreWinnerId) {
-    alert('El ganador seleccionado no coincide con el score.');
+    setAppError('El ganador seleccionado no coincide con el score.');
     return;
   }
 
   if (winnerId && !scoreWinnerId && (setsA === setsB || gamesA === gamesB)) {
-    alert('El score está empatado o no es decisivo. No puede guardarse así.');
+    setAppError('El score está empatado o no es decisivo. No puede guardarse así.');
     return;
   }
 
-  updateMatch(matchId, (match) => ({
-    ...match,
-    played: true,
-    winnerId: resolvedWinnerId,
-    loserId: resolvedWinnerId === match.pairAId ? match.pairBId : match.pairAId,
-    setsA,
-    setsB,
-    gamesA,
-    gamesB,
-    date,
-    time,
-    venue,
-  }));
+  try {
+    setFormBusy(form, true);
+    setAppError('');
+    await updateMatch(matchId, (currentMatch) => ({
+      ...currentMatch,
+      played: true,
+      winnerId: resolvedWinnerId,
+      loserId: resolvedWinnerId === currentMatch.pairAId ? currentMatch.pairBId : currentMatch.pairAId,
+      setsA,
+      setsB,
+      gamesA,
+      gamesB,
+      date,
+      time,
+      venue,
+    }));
+  } finally {
+    setFormBusy(form, false);
+  }
 });
 
-matchesList.addEventListener('submit', (event) => {
+matchesList.addEventListener('submit', async (event) => {
   if (!canEditTournament()) {
     return;
   }
@@ -1660,14 +1784,21 @@ matchesList.addEventListener('submit', (event) => {
 
   const matchId = form.dataset.agendaMatchId;
   const formData = new FormData(form);
-  updateMatchAgenda(matchId, {
-    date: normalizeText(formData.get('date') || ''),
-    time: normalizeText(formData.get('time') || ''),
-    venue: normalizeText(formData.get('venue') || ''),
-  });
+
+  try {
+    setFormBusy(form, true);
+    setAppError('');
+    await updateMatchAgenda(matchId, {
+      date: normalizeText(formData.get('date') || ''),
+      time: normalizeText(formData.get('time') || ''),
+      venue: normalizeText(formData.get('venue') || ''),
+    });
+  } finally {
+    setFormBusy(form, false);
+  }
 });
 
-bracketResultsList.addEventListener('change', (event) => {
+bracketResultsList.addEventListener('change', async (event) => {
   if (!canEditTournament()) {
     return;
   }
@@ -1684,31 +1815,29 @@ bracketResultsList.addEventListener('change', (event) => {
 
   const matchId = select.dataset.bracketMatchId;
   const winnerId = select.value.trim();
-  const nextBracketResults = (state.bracketResults || []).filter((result) => result.matchId !== matchId);
 
-  if (winnerId) {
-    nextBracketResults.push({ matchId, winnerId });
+  try {
+    select.disabled = true;
+    setAppError('');
+    await updateMatchApi(matchId, {
+      winnerId: winnerId || null,
+      played: Boolean(winnerId),
+      setsA: null,
+      setsB: null,
+      gamesA: null,
+      gamesB: null,
+      scoreA: null,
+      scoreB: null,
+    });
+    await refreshState();
+  } catch (error) {
+    await handleApiError(error, 'No se pudo actualizar el cuadro.');
+  } finally {
+    select.disabled = false;
   }
-
-  const nextState = {
-    ...state,
-    bracketResults: nextBracketResults,
-  };
-  const nextDerived = rebuildDerivedState(nextState);
-  const finalWinnerId = getFinalWinnerId(nextDerived);
-
-  setState({
-    ...nextDerived,
-    tournament: {
-      ...nextDerived.tournament,
-      winnerId: finalWinnerId,
-      closedAt: finalWinnerId ? nextDerived.tournament.closedAt : null,
-      status: finalWinnerId ? 'Campeón definido' : 'Resultados del cuadro actualizados',
-    },
-  });
 });
 
-clearPairs.addEventListener('click', () => {
+clearPairs.addEventListener('click', async () => {
   if (!isAdminUnlocked() || isTournamentFinalized()) {
     return;
   }
@@ -1718,143 +1847,109 @@ clearPairs.addEventListener('click', () => {
     return;
   }
 
-  setState({
-    ...state,
-    pairs: [],
-    groups: [],
-    matches: [],
-    standings: [],
-    bracket: [],
-    bracketResults: [],
-    bracketChampion: null,
-    tournament: {
-      ...state.tournament,
-      winnerId: null,
-      closedAt: null,
-      status: state.tournament.createdAt ? 'Torneo activo' : 'Sin torneo activo',
-    },
-  });
-  resetForm();
+  try {
+    setAppError('');
+    const tournament = state.tournament;
+    await deleteTournamentApi(tournament.id);
+    await createTournamentApi({
+      name: tournament.name,
+      date: tournament.date,
+      mode: tournament.mode,
+      place: tournament.place,
+      scoring_win: tournament.scoring?.win ?? 1,
+      scoring_loss: tournament.scoring?.loss ?? 0,
+      scoring_no_show: tournament.scoring?.noShow ?? 0,
+      rules_version: tournament.rulesVersion ?? 1,
+    });
+    await refreshState();
+    resetForm();
+  } catch (error) {
+    await handleApiError(error, 'No se pudieron vaciar las parejas.');
+  }
 });
 
-loadSamplePairs.addEventListener('click', () => {
+loadSamplePairs.addEventListener('click', async () => {
   if (!isAdminUnlocked() || isTournamentFinalized()) {
-    alert('Acceso denegado.');
+    setAppError('Acceso denegado.');
     return;
   }
 
   const state = getState();
   if (!hasActiveTournament(state)) {
-    alert('Creá un torneo antes de cargar parejas.');
+    setAppError('Creá un torneo antes de cargar parejas.');
     return;
   }
 
-  const playerMap = new Map((state.players || []).map((player) => [normalizeText(player.fullName).toLowerCase(), player]));
-  const nextPlayers = [...(state.players || [])];
+  try {
+    setAppError('');
+    const playerMap = new Map((state.players || []).map((player) => [normalizeText(player.fullName).toLowerCase(), player]));
 
-  const ensurePlayer = (fullName) => {
-    const cleanName = normalizeText(fullName);
-    const key = cleanName.toLowerCase();
-    if (playerMap.has(key)) {
-      return playerMap.get(key);
+    const ensurePlayer = async (fullName) => {
+      const cleanName = normalizeText(fullName);
+      const key = cleanName.toLowerCase();
+      if (playerMap.has(key)) {
+        return playerMap.get(key);
+      }
+
+      const [firstName = cleanName, ...rest] = cleanName.split(' ');
+      const created = await createPlayerApi({
+        firstName,
+        lastName: rest.join(' ') || firstName,
+        nickname: '',
+      });
+      playerMap.set(key, created);
+      return created;
+    };
+
+    for (const [name, playerOneName, playerTwoName] of samplePairs) {
+      const firstPlayer = await ensurePlayer(playerOneName);
+      const secondPlayer = await ensurePlayer(playerTwoName);
+      await createPairApi({
+        name,
+        playerOneId: firstPlayer.id,
+        playerTwoId: secondPlayer.id,
+      });
     }
 
-    const newPlayer = {
-      id: createId(),
-      firstName: cleanName.split(' ')[0] || cleanName,
-      lastName: cleanName.split(' ').slice(1).join(' '),
-      nickname: '',
-      fullName: cleanName,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    nextPlayers.push(newPlayer);
-    playerMap.set(key, newPlayer);
-    return newPlayer;
-  };
-
-  const nextPairs = samplePairs.map(([name, playerOneName, playerTwoName]) => {
-    const firstPlayer = ensurePlayer(playerOneName);
-    const secondPlayer = ensurePlayer(playerTwoName);
-
-    return {
-      id: createId(),
-      name,
-      playerOneId: firstPlayer.id,
-      playerTwoId: secondPlayer.id,
-      playerOne: getPlayerDisplayName(firstPlayer) || firstPlayer.fullName,
-      playerTwo: getPlayerDisplayName(secondPlayer) || secondPlayer.fullName,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-  });
-
-  setState({
-    ...state,
-    players: nextPlayers,
-    pairs: nextPairs,
-    tournament: {
-      ...state.tournament,
-      status: 'Parejas de prueba cargadas',
-      winnerId: null,
-      closedAt: null,
-    },
-    groups: [],
-    matches: [],
-    standings: [],
-    bracket: [],
-    bracketResults: [],
-    bracketChampion: null,
-  });
-
-  setActiveTab('parejas');
+    await refreshState();
+    setActiveTab('parejas');
+  } catch (error) {
+    await handleApiError(error, 'No se pudieron cargar las parejas de prueba.');
+  }
 });
 
-planTournament.addEventListener('click', () => {
+planTournament.addEventListener('click', async () => {
   if (!isAdminUnlocked() || isTournamentFinalized()) {
-    alert('Acceso denegado.');
+    setAppError('Acceso denegado.');
     return;
   }
 
   const state = getState();
   if (!hasActiveTournament(state)) {
-    alert('Creá un torneo antes de planificar.');
+    setAppError('Creá un torneo antes de planificar.');
     return;
   }
 
   const pairTotal = state.pairs.length;
 
   if (pairTotal < 2) {
-    alert('Necesitas al menos 2 parejas para planificar el torneo.');
+    setAppError('Necesitas al menos 2 parejas para planificar el torneo.');
     return;
   }
 
-    const groupCount = pairTotal >= 13 ? 4 : pairTotal >= 9 ? 3 : 2;
-  const groups = buildBalancedGroups(state.pairs, groupCount);
-  const matches = buildBalancedCrossGroupFixtures(state.pairs, groups, 2);
-
-  setState({
-    ...state,
-    tournament: {
-      ...state.tournament,
-      status: 'Torneo planificado',
-      winnerId: null,
-      closedAt: null,
-    },
-    groups,
-    matches,
-    standings: buildStandings(state.pairs, matches),
-    bracketResults: [],
-    bracketChampion: null,
-  });
-
-  setActiveTab('torneo');
+  try {
+    setAppError('');
+    await planTournamentApi(state.tournament.id);
+    await refreshState();
+    setActiveTab('torneo');
+  } catch (error) {
+    await handleApiError(error, 'No se pudo planificar el torneo.');
+  }
 });
 
-archiveTournament.addEventListener('click', () => {
+archiveTournament.addEventListener('click', async () => {
   if (!canEditTournament()) {
-    alert('Acceso denegado.');
+    setAppError('Acceso denegado.');
     return;
   }
 
@@ -1862,54 +1957,46 @@ archiveTournament.addEventListener('click', () => {
   const winnerId = getFinalWinnerId(state);
 
   if (!winnerId) {
-    alert('Primero resolvé el cuadro completo para definir al campeón.');
+    setAppError('Primero resolvé el cuadro completo para definir al campeón.');
     return;
   }
 
   if (state.tournament.closedAt || state.tournament.status === 'Archivado') {
-    alert('El torneo ya está cerrado.');
+    setAppError('El torneo ya está cerrado.');
     return;
   }
 
-  const snapshot = buildHistorySnapshot(state);
-  const nextHistory = [snapshot, ...(state.history || [])];
-  const nextBaseState = defaultState();
-
-  setState({
-    ...nextBaseState,
-    players: state.players,
-    history: nextHistory,
-    tournament: {
-      ...nextBaseState.tournament,
-      status: 'Torneo archivado',
-      winnerId,
-      closedAt: new Date().toISOString(),
-    },
-  });
-
-  setActiveTab('historial');
+  try {
+    setAppError('');
+    await archiveTournamentApi(state.tournament.id, winnerId);
+    await refreshState();
+    setActiveTab('historial');
+  } catch (error) {
+    await handleApiError(error, 'No se pudo archivar el torneo.');
+  }
 });
 
 fixtureStatusFilter.addEventListener('change', renderAll);
 fixturePlayerFilter.addEventListener('input', renderAll);
-tournamentWinner.addEventListener('change', () => {
+tournamentWinner.addEventListener('change', async () => {
   if (!canEditTournament()) {
     return;
   }
 
   const state = getState();
-  setState({
-    ...state,
-    tournament: {
-      ...state.tournament,
+  try {
+    await updateTournamentApi(state.tournament.id, {
       winnerId: tournamentWinner.value.trim() || null,
       closedAt: null,
-    },
-  });
+    });
+    await refreshState();
+  } catch (error) {
+    await handleApiError(error, 'No se pudo actualizar el ganador del torneo.');
+  }
 });
 
-adminLogout.addEventListener('click', () => {
-  lockAdmin();
+adminLogout.addEventListener('click', async () => {
+  await lockAdmin();
   adminLock.hidden = false;
   adminLock.classList.remove('is-hidden');
   adminContent.hidden = true;
@@ -1918,9 +2005,9 @@ adminLogout.addEventListener('click', () => {
   setActiveTab('admin');
 });
 
-document.addEventListener('keydown', (event) => {
+document.addEventListener('keydown', async (event) => {
   if (event.key === 'Escape' && isAdminUnlocked()) {
-    lockAdmin();
+    await lockAdmin();
     adminLock.hidden = false;
     adminLock.classList.remove('is-hidden');
     adminContent.hidden = true;
@@ -1933,8 +2020,26 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
-renderAll();
-setActiveTab('torneo');
+const initializeApp = async () => {
+  try {
+    await loadState().then((state) => {
+      appState = rebuildDerivedState(state);
+    });
+    await syncAdminSession();
+  } catch (error) {
+    setAppError(error?.message || 'No se pudo cargar la aplicación.');
+    appState = rebuildDerivedState(defaultState());
+  } finally {
+    renderAll();
+    syncTournamentCreationState();
+    syncAdminTwoColumnLayout();
+    syncAdminFormLabels();
+    setActiveTab('torneo');
+    syncTournamentPanelsVisibility();
+  }
+};
+
+void initializeApp();
 window.addEventListener('DOMContentLoaded', () => {
   function syncPlayersModalVisibility(open) {
     if (!playersModal) return;

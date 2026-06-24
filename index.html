@@ -38,6 +38,7 @@
       </nav>
 
       <main>
+        <div id="appError" class="app-error" hidden></div>
         <section class="panel is-active" id="tab-torneo">
           <div class="section-head">
             <h2>Información del torneo</h2>
@@ -159,13 +160,12 @@
           <section class="auth-card" id="adminLock">
             <h3>Acceso de administrador</h3>
             <p>Requerido para gestionar torneos, jugadores y parejas.</p>
-              <form class="auth-form" id="adminLoginForm">
-                <input id="adminPassword" type="hidden" />
-                <button type="button" class="primary" id="adminLoginButton">Ingresar</button>
-              </form>
-            <div class="auth-note">
-              Esta validación es operativa. No reemplaza autenticación real en backend.
-            </div>
+            <form class="auth-form" id="adminLoginForm">
+              <input id="adminUsername" type="text" autocomplete="username" placeholder="Usuario" required />
+              <input id="adminPassword" type="password" autocomplete="current-password" placeholder="Contraseña" required />
+              <button type="submit" class="primary" id="adminLoginButton">Ingresar</button>
+            </form>
+            <div id="adminLoginError" class="auth-error" hidden></div>
           </section>
 
           <section id="adminContent" hidden>

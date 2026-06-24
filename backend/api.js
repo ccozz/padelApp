@@ -292,6 +292,16 @@ export const createApiRouter = (db) => {
     jsonOk(res, { ok: true, admin: { id: admin.id, username: admin.username } });
   });
 
+  router.get('/auth/me', requireAdmin, (req, res) => {
+    jsonOk(res, {
+      ok: true,
+      admin: {
+        id: req.admin.sub,
+        username: req.admin.username,
+      },
+    });
+  });
+
   router.post('/auth/logout', (req, res) => {
     res.clearCookie(COOKIE_NAME, {
       httpOnly: true,
