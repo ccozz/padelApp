@@ -13,6 +13,7 @@ Webapp mobile-first para gestión de torneos de padel.
 - Requiere Node 24+.
 - Usa `node:sqlite` incorporado, sin dependencias nativas externas.
 - `seed.js` no cambió: solo crea el admin inicial.
+- Para altas y resets de jugadores hace falta una cuenta de Resend y `RESEND_API_KEY`.
 
 ### Variables de entorno
 - `PORT`
@@ -20,6 +21,8 @@ Webapp mobile-first para gestión de torneos de padel.
 - `ADMIN_USERNAME`
 - `ADMIN_PASSWORD_PLAIN`
 - `SESSION_SECRET` es obligatoria; si falta, el servidor no arranca.
+- `RESEND_API_KEY` es obligatoria para registro y reset de jugadores.
+- `FRONTEND_URL` apunta al frontend que recibirá los links de verificación y reset.
 
 ### Arranque desde cero
 1. Copiar `.env.example` a `.env` y completar valores.
@@ -58,6 +61,13 @@ Webapp mobile-first para gestión de torneos de padel.
 - `POST /api/players`
 - `PUT /api/players/:id`
 - `DELETE /api/players/:id`
+- `POST /api/players/register`
+- `GET /api/players/verify-email`
+- `POST /api/players/login`
+- `POST /api/players/logout`
+- `GET /api/players/me`
+- `POST /api/players/request-password-reset`
+- `POST /api/players/reset-password`
 
 #### Pairs
 - `GET /api/pairs`
@@ -78,3 +88,4 @@ Webapp mobile-first para gestión de torneos de padel.
 - Un `EVENT` pasa a archivado solo cuando todas sus categorías están archivadas.
 - El historial devuelve eventos agrupados con sus categorías archivadas anidadas.
 - Mantener `tournaments` como tabla de eventos evita una migración destructiva sobre la base ya existente.
+- Las cuentas de jugador no se vinculan automáticamente con jugadores cargados por el admin aunque coincidan nombres.

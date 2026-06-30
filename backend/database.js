@@ -9,7 +9,7 @@ const schemaStatements = schemaSqlWithoutComments
   .map((statement) => statement.trim())
   .filter(Boolean);
 const tableSchemaStatements = schemaStatements.filter((statement) => statement.startsWith('CREATE TABLE'));
-const indexSchemaStatements = schemaStatements.filter((statement) => statement.startsWith('CREATE INDEX'));
+const indexSchemaStatements = schemaStatements.filter((statement) => statement.startsWith('CREATE INDEX') || statement.startsWith('CREATE UNIQUE INDEX')); 
 
 export const getDatabasePath = () => resolve(process.cwd(), process.env.DB_PATH || './db/padel.sqlite');
 
@@ -90,6 +90,38 @@ const transformLegacySnapshot = (snapshotJson, eventRow, categoryRow) => {
     category: parsedSnapshot?.category || category,
     tournament: parsedSnapshot?.tournament || category,
   };
+};
+
+const migratePlayerAccountSchema = (db) => {
+  const playerColumns = getTableColumns(db, 'players');
+  const statements = [];
+
+  if (!playerColumns.includes('email')) {
+    statements.push("ALTER TABLE players ADD COLUMN email TEXT");
+  }
+
+  if (!playerColumns.includes('password_hash')) {
+    statements.push("ALTER TABLE players ADD COLUMN password_hash TEXT");
+  }
+
+  if (!playerColumns.includes('email_verified')) {
+    statements.push("ALTER TABLE players ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0");
+  }
+
+  if (!playerColumns.includes('account_status')) {
+    statements.push("ALTER TABLE players ADD COLUMN account_status TEXT NOT NULL DEFAULT 'sin_cuenta'");
+  }
+
+  if (statements.length) {
+    try {
+      db.exec(statements.join(';\n') + ';');
+    } catch (error) {
+      throw new Error(`Database bootstrap failed during player account migration: ${error.message}`);
+    }
+  }
+
+  db.prepare("UPDATE players SET account_status = 'sin_cuenta' WHERE account_status IS NULL OR account_status = ''").run();
+  db.prepare('UPDATE players SET email_verified = COALESCE(email_verified, 0) WHERE email_verified IS NULL').run();
 };
 
 const migrateLegacyTournamentModel = (db) => {
@@ -282,6 +314,12 @@ export const openDatabase = () => {
     runSchemaStatements(db, tableSchemaStatements, 'create tables');
 
     try {
+      migratePlayerAccountSchema(db);
+    } catch (error) {
+      throw new Error(`Database bootstrap failed during player account migration: ${error.message}`);
+    }
+
+    try {
       migrateLegacyTournamentModel(db);
     } catch (error) {
       throw new Error(`Database bootstrap failed during legacy migration: ${error.message}`);
@@ -297,5 +335,8 @@ export const openDatabase = () => {
     throw new Error(`Database bootstrap failed during openDatabase: ${error.message}`);
   }
 };
+
+
+
 
 

@@ -7,7 +7,8 @@ import {
   buildStandings,
   resolveBracketWinner,
 } from '../lib/tournament.js';
-import { COOKIE_NAME, requireAdmin, signSessionToken, verifyPassword } from './auth.js';
+import { COOKIE_NAME, PLAYER_COOKIE_NAME, requireAdmin, requirePlayerAuth, signPlayerSessionToken, signSessionToken, verifyPassword, hashPassword } from './auth.js';
+import { sendPasswordResetEmail, sendVerificationEmail } from './email.js';
 
 const jsonOk = (res, data, status = 200) => res.status(status).json(data);
 const jsonError = (res, status, error) => res.status(status).json({ error });
@@ -68,6 +69,41 @@ const parseOptionalBoolean = (value) => {
 
   return null;
 };
+
+const normalizeEmail = (value) => String(value ?? '').trim().toLowerCase();
+
+const getFrontendUrl = () => {
+  const frontendUrl = String(process.env.FRONTEND_URL ?? 'http://localhost:3000').trim().replace(/\/+$/, '');
+  return frontendUrl || 'http://localhost:3000';
+};
+
+const getPlayerByEmail = (db, email) => db.prepare('SELECT * FROM players WHERE email = ?').get(email);
+
+const getPlayerVerificationTokenByValue = (db, token) =>
+  db.prepare('SELECT * FROM player_verification_tokens WHERE token = ?').get(token);
+
+const getPlayerSessionCookieOptions = () => ({
+  httpOnly: true,
+  sameSite: 'lax',
+  secure: process.env.NODE_ENV === 'production',
+  path: '/',
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+});
+
+const buildPlayerPublicRecord = (player) => ({
+  id: player.id,
+  first_name: player.first_name,
+  firstName: player.first_name,
+  last_name: player.last_name,
+  lastName: player.last_name,
+  nickname: player.nickname || '',
+  full_name: player.full_name,
+  fullName: player.full_name,
+  email: player.email || null,
+  emailVerified: Boolean(player.email_verified),
+  accountStatus: player.account_status,
+  account_status: player.account_status,
+});
 
 const toIsoNow = () => new Date().toISOString();
 
@@ -154,13 +190,7 @@ const serializeCategory = (categoryRow) =>
       }
     : null;
 
-const decoratePlayer = (player) => ({
-  ...player,
-  firstName: player.first_name,
-  lastName: player.last_name,
-  nickname: player.nickname || '',
-  fullName: player.full_name,
-});
+const decoratePlayer = (player) => buildPlayerPublicRecord(player);
 
 const decoratePair = (pair, playerMap) => ({
   ...pair,
@@ -743,6 +773,219 @@ export const createApiRouter = (db) => {
     return jsonOk(res, { ok: true });
   });
 
+  router.post('/players/register', async (req, res) => {
+    const firstName = normalizeText(req.body?.firstName ?? req.body?.first_name);
+    const lastName = normalizeText(req.body?.lastName ?? req.body?.last_name);
+    const nickname = normalizeText(req.body?.nickname);
+    const email = normalizeEmail(req.body?.email);
+    const password = String(req.body?.password ?? '');
+
+    if (!firstName || !lastName || !email || !password) {
+      return jsonError(res, 400, 'firstName, lastName, email and password are required');
+    }
+
+    const existingPlayer = getPlayerByEmail(db, email);
+    if (existingPlayer) {
+      return jsonError(res, 409, 'El email ya está registrado');
+    }
+
+    const playerId = randomUUID();
+    const passwordHash = await hashPassword(password);
+
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.prepare(
+        `
+          INSERT INTO players (
+            id,
+            first_name,
+            last_name,
+            nickname,
+            full_name,
+            email,
+            password_hash,
+            email_verified,
+            account_status
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      ).run(playerId, firstName, lastName, nickname, `${firstName} ${lastName}`.trim(), email, passwordHash, 0, 'pendiente_verificacion');
+
+      const verificationToken = randomUUID();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      db.prepare(
+        `
+          INSERT INTO player_verification_tokens (id, player_id, token, type, expires_at, created_at, used_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+      ).run(randomUUID(), playerId, verificationToken, 'email_verification', expiresAt, toIsoNow(), null);
+      db.exec('COMMIT');
+    } catch (error) {
+      db.exec('ROLLBACK');
+      return jsonError(res, 500, error.message || 'Unable to register player');
+    }
+
+    try {
+      await sendVerificationEmail(email, `${getFrontendUrl()}/verify-email?token=${encodeURIComponent(verificationToken)}`);
+    } catch (error) {
+      return jsonError(res, 502, error.message || 'Unable to send verification email');
+    }
+
+    return jsonOk(res, { ok: true, message: 'Registro creado. Revisá tu email para verificar la cuenta.' }, 201);
+  });
+
+  router.get('/players/verify-email', (req, res) => {
+    const token = normalizeText(req.query?.token);
+    if (!token) {
+      return jsonError(res, 400, 'Verification token is required');
+    }
+
+    const tokenRow = getPlayerVerificationTokenByValue(db, token);
+    if (!tokenRow || tokenRow.type !== 'email_verification') {
+      return jsonError(res, 400, 'Invalid verification token');
+    }
+
+    if (tokenRow.used_at) {
+      return jsonError(res, 410, 'Verification token already used');
+    }
+
+    if (new Date(tokenRow.expires_at).getTime() < Date.now()) {
+      return jsonError(res, 410, 'Verification token expired');
+    }
+
+    const player = getPlayerById(db, tokenRow.player_id);
+    if (!player) {
+      return jsonError(res, 404, 'Player not found');
+    }
+
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.prepare('UPDATE players SET email_verified = 1, account_status = ? WHERE id = ?').run('activo', player.id);
+      db.prepare('UPDATE player_verification_tokens SET used_at = ? WHERE id = ?').run(toIsoNow(), tokenRow.id);
+      db.exec('COMMIT');
+      return jsonOk(res, { ok: true, message: 'Email verificado correctamente' });
+    } catch (error) {
+      db.exec('ROLLBACK');
+      return jsonError(res, 500, error.message || 'Unable to verify email');
+    }
+  });
+
+  router.post('/players/login', async (req, res) => {
+    const email = normalizeEmail(req.body?.email);
+    const password = String(req.body?.password ?? '');
+
+    if (!email || !password) {
+      return jsonError(res, 400, 'email and password are required');
+    }
+
+    const player = getPlayerByEmail(db, email);
+    if (!player || player.account_status === 'sin_cuenta') {
+      return jsonError(res, 401, 'Credenciales inválidas');
+    }
+
+    if (player.account_status === 'pendiente_verificacion' || !player.email_verified) {
+      return jsonError(res, 401, 'Debes verificar tu email antes de iniciar sesión');
+    }
+
+    if (player.account_status === 'bloqueado' || player.account_status === 'eliminado') {
+      return jsonError(res, 401, 'Tu cuenta no puede iniciar sesión');
+    }
+
+    const passwordOk = await verifyPassword(password, player.password_hash || '');
+    if (!passwordOk) {
+      return jsonError(res, 401, 'Credenciales inválidas');
+    }
+
+    const token = signPlayerSessionToken({ id: player.id, username: player.email || player.full_name || player.id });
+    res.cookie(PLAYER_COOKIE_NAME, token, getPlayerSessionCookieOptions());
+
+    return jsonOk(res, { ok: true, player: decoratePlayer(player) });
+  });
+
+  router.post('/players/logout', (_req, res) => {
+    res.clearCookie(PLAYER_COOKIE_NAME, getPlayerSessionCookieOptions());
+    return jsonOk(res, { ok: true });
+  });
+
+  router.get('/players/me', requirePlayerAuth(db), (req, res) => {
+    return jsonOk(res, { ok: true, player: decoratePlayer(req.player.player) });
+  });
+
+  router.post('/players/request-password-reset', async (req, res) => {
+    const email = normalizeEmail(req.body?.email);
+
+    if (!email) {
+      return jsonOk(res, { ok: true, message: 'Si el email existe, vas a recibir un link.' });
+    }
+
+    const player = getPlayerByEmail(db, email);
+    if (player && player.account_status === 'activo' && player.password_hash) {
+      const resetToken = randomUUID();
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        db.prepare(
+          `
+            INSERT INTO player_verification_tokens (id, player_id, token, type, expires_at, created_at, used_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `,
+        ).run(randomUUID(), player.id, resetToken, 'password_reset', expiresAt, toIsoNow(), null);
+        db.exec('COMMIT');
+      } catch (error) {
+        db.exec('ROLLBACK');
+        return jsonError(res, 500, error.message || 'Unable to create password reset token');
+      }
+
+      try {
+        await sendPasswordResetEmail(email, `${getFrontendUrl()}/reset-password?token=${encodeURIComponent(resetToken)}`);
+      } catch (error) {
+        return jsonError(res, 502, error.message || 'Unable to send password reset email');
+      }
+    }
+
+    return jsonOk(res, { ok: true, message: 'Si el email existe, vas a recibir un link.' });
+  });
+
+  router.post('/players/reset-password', async (req, res) => {
+    const token = normalizeText(req.body?.token);
+    const newPassword = String(req.body?.newPassword ?? '');
+
+    if (!token || !newPassword) {
+      return jsonError(res, 400, 'token and newPassword are required');
+    }
+
+    const tokenRow = getPlayerVerificationTokenByValue(db, token);
+    if (!tokenRow || tokenRow.type !== 'password_reset') {
+      return jsonError(res, 400, 'Invalid password reset token');
+    }
+
+    if (tokenRow.used_at) {
+      return jsonError(res, 410, 'Password reset token already used');
+    }
+
+    if (new Date(tokenRow.expires_at).getTime() < Date.now()) {
+      return jsonError(res, 410, 'Password reset token expired');
+    }
+
+    const player = getPlayerById(db, tokenRow.player_id);
+    if (!player) {
+      return jsonError(res, 404, 'Player not found');
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.prepare('UPDATE players SET password_hash = ? WHERE id = ?').run(passwordHash, player.id);
+      db.prepare('UPDATE player_verification_tokens SET used_at = ? WHERE id = ?').run(toIsoNow(), tokenRow.id);
+      db.exec('COMMIT');
+      return jsonOk(res, { ok: true, message: 'La contraseña fue actualizada.' });
+    } catch (error) {
+      db.exec('ROLLBACK');
+      return jsonError(res, 500, error.message || 'Unable to reset password');
+    }
+  });
+
   router.get('/pairs', (req, res) => {
     const categoryId = normalizeText(req.query.category_id ?? req.query.categoryId);
     const pairRows = categoryId ? getPairsByCategory(db, categoryId) : db.prepare('SELECT * FROM pairs ORDER BY name COLLATE NOCASE, id ASC').all();
@@ -1122,3 +1365,9 @@ export const createApiRouter = (db) => {
 
   return router;
 };
+
+
+
+
+
+

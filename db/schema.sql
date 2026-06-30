@@ -36,7 +36,21 @@ CREATE TABLE IF NOT EXISTS players (
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL,
   nickname TEXT NOT NULL DEFAULT '',
-  full_name TEXT NOT NULL
+  full_name TEXT NOT NULL,
+  email TEXT,
+  password_hash TEXT,
+  email_verified INTEGER NOT NULL DEFAULT 0,
+  account_status TEXT NOT NULL DEFAULT 'sin_cuenta'
+);
+
+CREATE TABLE IF NOT EXISTS player_verification_tokens (
+  id TEXT PRIMARY KEY,
+  player_id TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  token TEXT NOT NULL UNIQUE,
+  type TEXT NOT NULL CHECK (type IN ('email_verification', 'password_reset')),
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  used_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS pairs (
@@ -92,7 +106,9 @@ CREATE TABLE IF NOT EXISTS admins (
   password_hash TEXT NOT NULL
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_players_email_unique ON players(email) WHERE email IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_categories_event_id ON categories(event_id);
+CREATE INDEX IF NOT EXISTS idx_player_verification_tokens_player_id ON player_verification_tokens(player_id);
 CREATE INDEX IF NOT EXISTS idx_pairs_category_id ON pairs(category_id);
 CREATE INDEX IF NOT EXISTS idx_groups_category_id ON groups(category_id);
 CREATE INDEX IF NOT EXISTS idx_matches_category_id ON matches(category_id);
