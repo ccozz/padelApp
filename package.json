@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node server.js",
-    "start": "node server.js",
+    "dev": "node --env-file=.env server.js",
+    "start": "node --env-file=.env server.js",
     "db:seed": "node seed.js"
   },
   "dependencies": {
@@ -17,3 +17,4 @@
     "resend": "^6.16.0"
   }
 }
+

@@ -1,13 +1,11 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
-import dotenv from 'dotenv';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDatabase } from './backend/database.js';
 import { getSessionSecret } from './backend/auth.js';
 import { createApiRouter } from './backend/api.js';
 
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -40,3 +38,4 @@ app.use((error, _req, res, _next) => {
 app.listen(port, () => {
   console.log(`padelApp running at http://localhost:${port}`);
 });
+
