@@ -791,6 +791,7 @@ export const createApiRouter = (db) => {
 
     const playerId = randomUUID();
     const passwordHash = await hashPassword(password);
+    const verificationToken = randomUUID();
 
     db.exec('BEGIN IMMEDIATE');
     try {
@@ -1365,6 +1366,7 @@ export const createApiRouter = (db) => {
 
   return router;
 };
+
 
 
 
