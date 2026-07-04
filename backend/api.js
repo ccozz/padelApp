@@ -112,6 +112,16 @@ const getCategoryById = (db, categoryId) => db.prepare('SELECT * FROM categories
 const getPlayerById = (db, playerId) => db.prepare('SELECT * FROM players WHERE id = ?').get(playerId);
 const getPairById = (db, pairId) => db.prepare('SELECT * FROM pairs WHERE id = ?').get(pairId);
 
+const buildDecoratedPairFromRow = (db, pairRow) => {
+  if (!pairRow) {
+    return null;
+  }
+
+  const players = getPlayers(db).map(decoratePlayer);
+  const playerMap = new Map(players.map((player) => [player.id, player]));
+  return decoratePair(pairRow, playerMap);
+};
+
 const getPlayers = (db) =>
   db.prepare('SELECT * FROM players ORDER BY last_name COLLATE NOCASE, first_name COLLATE NOCASE, nickname COLLATE NOCASE').all();
 
@@ -138,6 +148,80 @@ const getPairsByCategory = (db, categoryId) =>
 
 const getGroupsByCategory = (db, categoryId) =>
   db.prepare('SELECT * FROM groups WHERE category_id = ? ORDER BY name COLLATE NOCASE, id ASC').all(categoryId);
+
+const getWaitlistByCategory = (db, categoryId) =>
+  db
+    .prepare(
+      `
+        SELECT *
+        FROM waitlist
+        WHERE category_id = ?
+        ORDER BY datetime(requested_at) ASC, id ASC
+      `,
+    )
+    .all(categoryId);
+
+const getCategoryPairCount = (db, categoryId) =>
+  db.prepare('SELECT COUNT(*) AS count FROM pairs WHERE category_id = ?').get(categoryId)?.count || 0;
+
+const getCategoryInscriptions = (db, categoryId) => {
+  const players = getPlayers(db).map(decoratePlayer);
+  const playerMap = new Map(players.map((player) => [player.id, player]));
+  const pairRows = getPairsByCategory(db, categoryId);
+  const waitlistRows = getWaitlistByCategory(db, categoryId);
+
+  return {
+    pairs: pairRows.map((pair) => decoratePair(pair, playerMap)),
+    waitlist: waitlistRows.map((row) => ({
+      ...row,
+      categoryId: row.category_id,
+      playerId: row.player_id,
+      partnerId: row.partner_id,
+      requestedAt: row.requested_at,
+      player: playerMap.get(row.player_id) || null,
+      partner: playerMap.get(row.partner_id) || null,
+    })),
+  };
+};
+
+const getPairByPlayerInCategory = (db, categoryId, playerId) =>
+  db
+    .prepare(
+      `
+        SELECT *
+        FROM pairs
+        WHERE category_id = ? AND (player_one_id = ? OR player_two_id = ?)
+        LIMIT 1
+      `,
+    )
+    .get(categoryId, playerId, playerId);
+
+const getPendingWaitlistEntry = (db, categoryId) =>
+  db
+    .prepare(
+      `
+        SELECT *
+        FROM waitlist
+        WHERE category_id = ? AND status = 'pendiente'
+        ORDER BY datetime(requested_at) ASC, id ASC
+        LIMIT 1
+      `,
+    )
+    .get(categoryId);
+
+const hasPendingWaitlistEntryForPlayer = (db, categoryId, playerId) =>
+  Boolean(
+    db
+      .prepare(
+        `
+          SELECT 1
+          FROM waitlist
+          WHERE category_id = ? AND status = 'pendiente' AND (player_id = ? OR partner_id = ?)
+          LIMIT 1
+        `,
+      )
+      .get(categoryId, playerId, playerId),
+  );
 
 const getGroupPairs = (db, groupIds) => {
   if (!groupIds.length) {
@@ -262,6 +346,7 @@ const buildCategoryBundle = (db, categoryRow, players = null, includePlayers = t
       bracket: [],
       bracketResults: [],
       bracketChampion: null,
+      waitlist: [],
     };
   }
 
@@ -301,6 +386,15 @@ const buildCategoryBundle = (db, categoryRow, players = null, includePlayers = t
     bracket,
     bracketResults,
     bracketChampion: bracketOutcome.champion,
+    waitlist: getWaitlistByCategory(db, categoryRow.id).map((row) => ({
+      ...row,
+      categoryId: row.category_id,
+      playerId: row.player_id,
+      partnerId: row.partner_id,
+      requestedAt: row.requested_at,
+      player: playerMap.get(row.player_id) || null,
+      partner: playerMap.get(row.partner_id) || null,
+    })),
   };
 };
 
@@ -464,12 +558,13 @@ const updateCategoryFields = (db, categoryId, body) => {
   db.prepare(
     `
       UPDATE categories
-      SET name = ?, status = ?, winner_pair_id = ?, closed_at = ?, scoring_win = ?, scoring_loss = ?, scoring_no_show = ?, rules_version = ?
+      SET name = ?, status = ?, max_pairs = ?, winner_pair_id = ?, closed_at = ?, scoring_win = ?, scoring_loss = ?, scoring_no_show = ?, rules_version = ?
       WHERE id = ?
     `,
   ).run(
     normalizeText(body.name ?? current.name) || current.name,
     normalizeText(body.status ?? current.status) || current.status,
+    parseOptionalNumber(body.maxPairs ?? body.max_pairs) ?? current.max_pairs ?? null,
     body.winnerPairId ?? body.winner_pair_id ?? current.winner_pair_id ?? null,
     body.closedAt ?? body.closed_at ?? current.closed_at ?? null,
     parseOptionalNumber(body.scoringWin ?? body.scoring_win) ?? current.scoring_win,
@@ -480,6 +575,60 @@ const updateCategoryFields = (db, categoryId, body) => {
   );
 
   return getCategoryById(db, categoryId);
+};
+
+const createPairRowForCategory = (db, categoryId, playerOneId, playerTwoId, name = '') => {
+  const playerOne = getPlayerById(db, playerOneId);
+  const playerTwo = getPlayerById(db, playerTwoId);
+  if (!playerOne || !playerTwo) {
+    return null;
+  }
+
+  const pairId = randomUUID();
+  const pairName = normalizeText(name) || buildPairNameFromPlayers(playerOne, playerTwo);
+
+  db.prepare(
+    `
+      INSERT INTO pairs (id, category_id, name, player_one_id, player_two_id)
+      VALUES (?, ?, ?, ?, ?)
+    `,
+  ).run(pairId, categoryId, pairName, playerOneId, playerTwoId);
+
+  return getPairById(db, pairId);
+};
+
+const ensureCategoryCanReceiveInscriptions = (category) => category && category.status !== 'Torneo archivado';
+
+const ensurePairDoesNotExistInCategory = (db, categoryId, playerId) => !getPairByPlayerInCategory(db, categoryId, playerId);
+
+const addWaitlistEntry = (db, categoryId, playerId, partnerId, status = 'pendiente') => {
+  const entryId = randomUUID();
+  db.prepare(
+    `
+      INSERT INTO waitlist (id, category_id, player_id, partner_id, requested_at, status)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `,
+  ).run(entryId, categoryId, playerId, partnerId, toIsoNow(), status);
+
+  return db.prepare('SELECT * FROM waitlist WHERE id = ?').get(entryId);
+};
+
+const promoteFirstWaitlistEntry = (db, categoryId) => {
+  const pendingEntry = getPendingWaitlistEntry(db, categoryId);
+  if (!pendingEntry) {
+    return null;
+  }
+
+  const createdPair = createPairRowForCategory(db, categoryId, pendingEntry.player_id, pendingEntry.partner_id);
+  if (!createdPair) {
+    return null;
+  }
+
+  db.prepare("UPDATE waitlist SET status = 'promovido' WHERE id = ?").run(pendingEntry.id);
+  return {
+    waitlist: db.prepare('SELECT * FROM waitlist WHERE id = ?').get(pendingEntry.id),
+    pair: createdPair,
+  };
 };
 
 export const createApiRouter = (db) => {
@@ -600,15 +749,16 @@ export const createApiRouter = (db) => {
             event_id,
             name,
             status,
+            max_pairs,
             winner_pair_id,
             closed_at,
             scoring_win,
             scoring_loss,
             scoring_no_show,
             rules_version
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
-      ).run(categoryId, eventId, categoryName, 'Torneo activo', null, null, scoringWin, scoringLoss, scoringNoShow, rulesVersion);
+      ).run(categoryId, eventId, categoryName, 'Torneo activo', parseOptionalNumber(req.body?.maxPairs ?? req.body?.max_pairs) ?? null, null, null, scoringWin, scoringLoss, scoringNoShow, rulesVersion);
 
       db.exec('COMMIT');
       return jsonOk(res, buildEventBundle(db, getEventById(db, eventId)), 201);
@@ -663,22 +813,23 @@ export const createApiRouter = (db) => {
     const scoringNoShow = parseOptionalNumber(req.body?.scoringNoShow ?? req.body?.scoring_no_show) ?? 0;
     const rulesVersion = parseOptionalNumber(req.body?.rulesVersion ?? req.body?.rules_version) ?? 1;
 
-    db.prepare(
-      `
-        INSERT INTO categories (
-          id,
-          event_id,
-          name,
-          status,
-          winner_pair_id,
-          closed_at,
-          scoring_win,
-          scoring_loss,
-          scoring_no_show,
-          rules_version
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-    ).run(categoryId, event.id, categoryName, 'Torneo activo', null, null, scoringWin, scoringLoss, scoringNoShow, rulesVersion);
+      db.prepare(
+        `
+          INSERT INTO categories (
+            id,
+            event_id,
+            name,
+            status,
+            max_pairs,
+            winner_pair_id,
+            closed_at,
+            scoring_win,
+            scoring_loss,
+            scoring_no_show,
+            rules_version
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+    ).run(categoryId, event.id, categoryName, 'Torneo activo', parseOptionalNumber(req.body?.maxPairs ?? req.body?.max_pairs) ?? null, null, null, scoringWin, scoringLoss, scoringNoShow, rulesVersion);
 
     syncEventStatus(db, event.id);
     return jsonOk(res, buildEventBundle(db, getEventById(db, event.id)), 201);
@@ -1090,6 +1241,181 @@ export const createApiRouter = (db) => {
 
     db.prepare('DELETE FROM pairs WHERE id = ?').run(req.params.id);
     return jsonOk(res, { ok: true });
+  });
+
+  router.get('/categories/:id/inscriptions', (req, res) => {
+    const category = getCategoryById(db, req.params.id);
+    if (!category) {
+      return jsonError(res, 404, 'Category not found');
+    }
+
+    return jsonOk(res, {
+      category: serializeCategory(category),
+      ...getCategoryInscriptions(db, category.id),
+      maxPairs: category.max_pairs ?? null,
+      pairCount: getCategoryPairCount(db, category.id),
+    });
+  });
+
+  router.post('/categories/:id/inscriptions', requirePlayerAuth(db), (req, res) => {
+    const category = getCategoryById(db, req.params.id);
+    if (!category) {
+      return jsonError(res, 404, 'Category not found');
+    }
+
+    if (!ensureCategoryCanReceiveInscriptions(category)) {
+      return jsonError(res, 409, 'Archived categories cannot receive inscriptions');
+    }
+
+    const partnerId = normalizeText(req.body?.partnerId ?? req.body?.partner_id);
+    const playerId = req.player.player.id;
+    if (!partnerId) {
+      return jsonError(res, 400, 'partnerId is required');
+    }
+
+    if (partnerId === playerId) {
+      return jsonError(res, 400, 'You cannot form a pair with yourself');
+    }
+
+    const partner = getPlayerById(db, partnerId);
+    if (!partner) {
+      return jsonError(res, 404, 'Partner not found');
+    }
+
+    if (
+      !ensurePairDoesNotExistInCategory(db, category.id, playerId) ||
+      !ensurePairDoesNotExistInCategory(db, category.id, partnerId) ||
+      hasPendingWaitlistEntryForPlayer(db, category.id, playerId) ||
+      hasPendingWaitlistEntryForPlayer(db, category.id, partnerId)
+    ) {
+      return jsonError(res, 409, 'One of the players is already registered in this category');
+    }
+
+    const players = getPlayers(db).map(decoratePlayer);
+    const playerMap = new Map(players.map((player) => [player.id, player]));
+    const pairCount = getCategoryPairCount(db, category.id);
+    const hasCapacity = category.max_pairs == null || pairCount < category.max_pairs;
+
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      if (!hasCapacity) {
+        const waitlistEntry = addWaitlistEntry(db, category.id, playerId, partnerId, 'pendiente');
+        db.exec('COMMIT');
+        return jsonOk(
+          res,
+          {
+            ok: true,
+            waitlisted: true,
+            waitlist: {
+              ...waitlistEntry,
+              categoryId: waitlistEntry.category_id,
+              playerId: waitlistEntry.player_id,
+              partnerId: waitlistEntry.partner_id,
+              requestedAt: waitlistEntry.requested_at,
+              player: playerMap.get(waitlistEntry.player_id) || null,
+              partner: playerMap.get(waitlistEntry.partner_id) || null,
+            },
+          },
+          202,
+        );
+      }
+
+      const pairRow = createPairRowForCategory(db, category.id, playerId, partnerId);
+      if (!pairRow) {
+        throw new Error('Unable to create pair');
+      }
+
+      db.exec('COMMIT');
+      return jsonOk(res, { ok: true, waitlisted: false, pair: decoratePair(pairRow, playerMap) }, 201);
+    } catch (error) {
+      db.exec('ROLLBACK');
+      return jsonError(res, 500, error.message || 'Unable to create inscription');
+    }
+  });
+
+  router.post('/categories/:id/waitlist', requirePlayerAuth(db), (req, res) => {
+    const category = getCategoryById(db, req.params.id);
+    if (!category) {
+      return jsonError(res, 404, 'Category not found');
+    }
+
+    if (!ensureCategoryCanReceiveInscriptions(category)) {
+      return jsonError(res, 409, 'Archived categories cannot receive waitlist entries');
+    }
+
+    if (category.max_pairs == null) {
+      return jsonError(res, 409, 'This category does not define a capacity');
+    }
+
+    const partnerId = normalizeText(req.body?.partnerId ?? req.body?.partner_id);
+    const playerId = req.player.player.id;
+    if (!partnerId) {
+      return jsonError(res, 400, 'partnerId is required');
+    }
+
+    if (partnerId === playerId) {
+      return jsonError(res, 400, 'You cannot form a pair with yourself');
+    }
+
+    const partner = getPlayerById(db, partnerId);
+    if (!partner) {
+      return jsonError(res, 404, 'Partner not found');
+    }
+
+    if (getCategoryPairCount(db, category.id) < category.max_pairs) {
+      return jsonError(res, 409, 'The category still has available spots');
+    }
+
+    if (
+      !ensurePairDoesNotExistInCategory(db, category.id, playerId) ||
+      !ensurePairDoesNotExistInCategory(db, category.id, partnerId) ||
+      hasPendingWaitlistEntryForPlayer(db, category.id, playerId) ||
+      hasPendingWaitlistEntryForPlayer(db, category.id, partnerId)
+    ) {
+      return jsonError(res, 409, 'One of the players is already registered in this category');
+    }
+
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      const waitlistEntry = addWaitlistEntry(db, category.id, playerId, partnerId, 'pendiente');
+      db.exec('COMMIT');
+      return jsonOk(res, { ok: true, waitlist: waitlistEntry }, 201);
+    } catch (error) {
+      db.exec('ROLLBACK');
+      return jsonError(res, 500, error.message || 'Unable to add waitlist entry');
+    }
+  });
+
+  router.delete('/categories/:id/inscriptions/:pairId', requireAdmin, (req, res) => {
+    const category = getCategoryById(db, req.params.id);
+    if (!category) {
+      return jsonError(res, 404, 'Category not found');
+    }
+
+    const pair = getPairById(db, req.params.pairId);
+    if (!pair || pair.category_id !== category.id) {
+      return jsonError(res, 404, 'Pair not found');
+    }
+
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.prepare('DELETE FROM pairs WHERE id = ?').run(pair.id);
+      const promoted = promoteFirstWaitlistEntry(db, category.id);
+      db.exec('COMMIT');
+
+      return jsonOk(res, {
+        ok: true,
+        promoted: promoted
+          ? {
+              pair: decoratePair(promoted.pair, new Map(getPlayers(db).map((player) => [player.id, decoratePlayer(player)]))),
+              waitlist: promoted.waitlist,
+            }
+          : null,
+      });
+    } catch (error) {
+      db.exec('ROLLBACK');
+      return jsonError(res, 500, error.message || 'Unable to revoke inscription');
+    }
   });
 
   router.post('/categories/:id/plan', requireAdmin, (req, res) => {

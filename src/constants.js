@@ -1,12 +1,13 @@
 export const defaultState = () => ({
-  tournament: {
-    name: 'Torneo de padel',
+  event: {
+    id: '',
+    name: 'Torneo de pádel',
     date: '',
     mode: '',
     place: '',
-    status: 'Sin torneo activo',
+    status: 'Sin evento activo',
     createdAt: null,
-    winnerId: null,
+    winnerId: '',
     closedAt: null,
     scoring: {
       win: 1,
@@ -15,20 +16,24 @@ export const defaultState = () => ({
     },
     rulesVersion: 1,
   },
+  categories: [],
+  selectedCategoryId: null,
+  selectedCategory: null,
   players: [],
   pairs: [],
   groups: [],
   matches: [],
   standings: [],
   bracket: [],
-  history: [],
   bracketResults: [],
+  bracketChampion: null,
+  history: [],
 });
 
 export const rules = [
-  'La fase de grupos se juega con partidos entre grupos y los puntos van a una tabla general unica.',
-  'La clasificacion sale de la tabla general y de ahi se definen los cruces a cuartos.',
+  'Cada evento contiene una o más categorías; cada categoría se planifica y archiva por separado.',
+  'Las parejas pertenecen a una categoría, no al evento completo.',
   'Victoria: 1 punto. Derrota: 0 puntos.',
-  'No presentacion o abandono: derrota por 6-0 6-0 y victoria por 6-0 6-0 para el rival.',
-  'Desempate entre dos parejas: enfrentamiento directo, diferencia de sets, diferencia de juegos.',
+  'No presentación o abandono: derrota por 6-0 6-0 y victoria para el rival por 6-0 6-0.',
+  'Desempate entre dos parejas: enfrentamiento directo, diferencia de sets y diferencia de games.',
 ];

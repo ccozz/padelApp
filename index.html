@@ -3,311 +3,306 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0f172a" />
+    <meta name="theme-color" content="#16131F" />
     <title>padelApp</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700&family=Rubik:wght@700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./src/styles.css" />
   </head>
   <body>
     <div class="app-shell">
-      <header class="hero">
+      <aside class="desktop-sidebar card">
         <div>
-          <p class="eyebrow">Torneo de padel</p>
-          <h1>padelApp</h1>
-          <p class="subtitle">App de gestión para torneos de pádel.</p>
+          <p class="eyebrow">padelApp</p>
+          <h1 id="eventName">Torneo de pádel</h1>
+          <p id="eventSubtitle" class="subtitle">Gestión mobile-first para eventos, categorías y estadísticas.</p>
         </div>
-        <div class="hero-card">
-          <span class="hero-label">Estado</span>
-          <strong id="tournamentStatus">Proyecto inicial</strong>
-          <small>Vista pública + panel admin</small>
+        <button type="button" class="theme-toggle secondary" id="themeToggle">Tema</button>
+        <nav class="sidebar-nav" aria-label="Navegación principal">
+          <button class="tab is-active" data-tab="inicio">Inicio</button>
+          <button class="tab" data-tab="fixture">Fixture</button>
+          <button class="tab" data-tab="tabla">Tabla</button>
+          <button class="tab" data-tab="mas">Más</button>
+        </nav>
+        <button type="button" class="secondary" data-tab="admin">Admin</button>
+      </aside>
+
+      <div class="app-main">
+        <header class="hero card">
+          <div class="hero-copy">
+            <p class="eyebrow">Torneo de pádel</p>
+            <h1 id="eventNameMobile">padelApp</h1>
+            <p id="eventSubtitleMobile" class="subtitle">Gestión mobile-first para eventos, categorías y estadísticas.</p>
+          </div>
+          <div class="hero-meta card">
+            <span class="card-label">Estado</span>
+            <strong id="eventStatus">Sin evento activo</strong>
+            <p id="eventMeta">Creá un evento desde el panel de admin.</p>
+          </div>
+        </header>
+
+        <div class="top-actions">
+          <button type="button" class="secondary theme-toggle-mobile" id="themeToggleMobile">Tema</button>
+          <button type="button" class="secondary" data-tab="admin">Admin</button>
         </div>
-      </header>
 
-      <nav class="tabs" aria-label="Secciones del torneo">
-        <button class="tab is-active" data-tab="torneo">Torneo</button>
-        <button class="tab" data-tab="fixture">Fixture</button>
-        <button class="tab" data-tab="reglas">Reglas</button>
-        <button class="tab" data-tab="parejas">Parejas</button>
-        <button class="tab" data-tab="historial">Historial</button>
-        <button class="tab" data-tab="admin">Admin</button>
-      </nav>
+        <div id="appError" class="app-error card" hidden></div>
 
-      <main>
-        <div id="appError" class="app-error" hidden></div>
-        <section class="panel is-active" id="tab-torneo">
-          <div class="section-head">
-            <h2>Información del torneo</h2>
-            <p>Resumen público de la competencia.</p>
-          </div>
-          <details class="card tournament-details">
-            <summary>
-              <span class="card-label">Información del torneo</span>
-              <strong id="tournamentInfoTitle">Sin torneo activo</strong>
-              <p id="tournamentInfoMeta">Creá un torneo desde el panel de admin.</p>
-            </summary>
-            <div class="grid cards tournament-details-grid">
-              <article class="card">
-                <span class="card-label">Formato</span>
-                <strong>Grupos + eliminación</strong>
-                <p>Fase inicial normalizada y cuadro final automático.</p>
-              </article>
-              <article class="card">
-                <span class="card-label">Puntaje</span>
-                <strong>Victoria 1 / Derrota 0</strong>
-                <p>Regla base definida para esta versión.</p>
-              </article>
-              <article class="card">
-                <span class="card-label">Desempate</span>
-                <strong>Directo, sets, games</strong>
-                <p>Orden de desempate por enfrentamiento y métricas deportivas.</p>
-              </article>
+        <div id="categoryRail" class="category-rail"></div>
+
+        <main class="content">
+          <section class="panel is-active" id="tab-inicio">
+            <div class="section-head">
+              <h2>Inicio</h2>
+              <p>Vista pública del evento activo y sus categorías.</p>
             </div>
-          </details>
-
-          <section class="card block-card">
-            <span class="card-label">Grupos</span>
-            <h3>Fase de grupos</h3>
-            <div id="groupsList" class="stack-list groups-grid"></div>
+            <div class="stack-list" id="overviewList"></div>
           </section>
 
-          <section class="card block-card">
-            <span class="card-label">Tabla general</span>
-            <h3>Clasificación acumulada</h3>
-            <div id="standingsList" class="table-list"></div>
-          </section>
-
-          <section class="card block-card" id="podiumSection">
-            <span class="card-label">Podio</span>
-            <h3>Escalonado final 1-2-3</h3>
-            <div id="podiumList" class="podium-grid"></div>
-          </section>
-
-          <section class="card block-card">
-            <span class="card-label">Cuadro final</span>
-            <h3>Clasificación a eliminación</h3>
-            <div id="bracketList" class="stack-list"></div>
-          </section>
-
-          <section class="card block-card">
-            <span class="card-label">Resultados del cuadro</span>
-            <h3>Avance de rondas</h3>
-            <div id="bracketResultsList" class="stack-list"></div>
-          </section>
-        </section>
-
-          <section class="panel" id="tab-reglas">
-          <div class="section-head">
-            <h2>Reglas</h2>
-            <p>Reglas consolidadas para el armado del torneo.</p>
-          </div>
-          <ul class="rules-list" id="rulesList"></ul>
-        </section>
-
-        <section class="panel" id="tab-fixture">
-          <div class="section-head">
-            <h2>Fixture</h2>
-            <p>Partidos del torneo activo agrupados por día, con filtros por estado y jugador.</p>
-          </div>
-
-          <section class="card block-card">
-            <div class="history-grid">
-              <label>
-                Estado
-                <select id="fixtureStatusFilter">
-                  <option value="all">Todos</option>
-                  <option value="past">Anteriores</option>
-                  <option value="future">Futuros</option>
-                </select>
-              </label>
-              <label>
-                Jugador
-                <input id="fixturePlayerFilter" type="text" placeholder="Buscar por nombre o apellido" />
-              </label>
+          <section class="panel" id="tab-fixture">
+            <div class="section-head">
+              <h2>Fixture</h2>
+              <p>Partidos por categoría, agrupados por día.</p>
             </div>
-            <div id="matchesList" class="stack-list"></div>
-          </section>
-        </section>
-
-        <section class="panel" id="tab-parejas">
-          <div class="section-head">
-            <h2>Parejas</h2>
-            <p>Registro de parejas cargadas en el sistema.</p>
-          </div>
-          <div class="pairs-toolbar">
-            <div class="toolbar-card">
-              <span class="card-label">Total</span>
-              <strong id="pairsCount">0</strong>
+            <div class="category-context card">
+              <strong id="fixtureCategoryTitle">Sin categoría seleccionada</strong>
+              <p id="fixtureCategoryMeta">Elegí una categoría para ver su fixture.</p>
             </div>
-            <div class="toolbar-card">
-              <span class="card-label">Guardado</span>
-              <strong>Local</strong>
-            </div>
-          </div>
-          <div class="pairs-list" id="pairsList"></div>
-        </section>
-
-        <section class="panel" id="tab-admin">
-          <div class="section-head">
-            <h2>Panel de admin</h2>
-            <p>Gestión de torneos, jugadores y parejas.</p>
-          </div>
-
-          <section class="auth-card" id="adminLock">
-            <h3>Acceso de administrador</h3>
-            <p>Requerido para gestionar torneos, jugadores y parejas.</p>
-            <form class="auth-form" id="adminLoginForm">
-              <input id="adminUsername" type="text" autocomplete="username" placeholder="Usuario" required />
-              <input id="adminPassword" type="password" autocomplete="current-password" placeholder="Contraseña" required />
-              <button type="submit" class="primary" id="adminLoginButton">Ingresar</button>
-            </form>
-            <div id="adminLoginError" class="auth-error" hidden></div>
+            <div id="fixtureList" class="stack-list"></div>
           </section>
 
-          <section id="adminContent" hidden>
-          <div class="admin-session-bar">
-            <div class="admin-session-copy">
-              <h3>Sesión activa</h3>
-              <p>El acceso queda guardado durante esta sesión del navegador.</p>
+          <section class="panel" id="tab-tabla">
+            <div class="section-head">
+              <h2>Tabla</h2>
+              <p>Clasificación, cuadro y resultados de la categoría seleccionada.</p>
             </div>
-            <button type="button" class="secondary is-danger" id="adminLogout">Cerrar sesión</button>
-          </div>
-
-          <div class="admin-layout-grid">
-          <section class="card block-card tournament-admin-card">
-            <span class="card-label">Torneo</span>
-            <h3>Crear o reemplazar torneo</h3>
-            <div id="currentTournamentSummary" class="active-tournament-summary" hidden></div>
-            <form class="admin-form" id="tournamentForm">
-              <label>
-                Fecha
-                <input id="tournamentDate" type="date" required />
-              </label>
-              <label>
-                Modo
-                <select id="tournamentMode" required>
-                  <option value="">Seleccionar modo</option>
-                  <option value="clasico">Clásico</option>
-                  <option value="americano">Americano</option>
-                </select>
-              </label>
-              <label>
-                Lugar
-                <input id="tournamentPlace" type="text" placeholder="Sede o club" required />
-              </label>
-              <button type="submit" class="primary">Crear torneo</button>
-            </form>
-            <div class="admin-actions">
-              <button type="button" class="secondary" id="deleteCurrentTournament">Eliminar torneo actual</button>
+            <div class="category-context card">
+              <strong id="tableCategoryTitle">Sin categoría seleccionada</strong>
+              <p id="tableCategoryMeta">Elegí una categoría para ver la tabla.</p>
             </div>
+            <section class="card block-card">
+              <span class="card-label">Grupos</span>
+              <div id="groupsList" class="stack-list"></div>
+            </section>
+            <section class="card block-card">
+              <span class="card-label">Tabla</span>
+              <div id="standingsList" class="table-list"></div>
+            </section>
+            <section class="card block-card">
+              <span class="card-label">Cuadro</span>
+              <div id="bracketList" class="stack-list"></div>
+            </section>
+            <section class="card block-card">
+              <span class="card-label">Resultados</span>
+              <div id="bracketResultsList" class="stack-list"></div>
+            </section>
           </section>
 
-          <form class="admin-form pair-form-card" id="pairForm">
-            <input id="pairId" type="hidden" />
-            <span class="card-label">Parejas</span>
-            <h3>Crear pareja</h3>
-            <label>
-              Nombre de la pareja
-              <input id="pairName" type="text" placeholder="Ej: Juli Gutiérrez / Mery Arma" required />
-            </label>
-            <label>
-              Jugador 1
-              <select id="playerOneSelect" required></select>
-            </label>
-            <label>
-              Jugador 2
-              <select id="playerTwoSelect" required></select>
-            </label>
-            <button type="submit" class="primary">Guardar pareja</button>
-          </form>
+          <section class="panel" id="tab-mas">
+            <div class="section-head">
+              <h2>Más</h2>
+              <p>Reglas, parejas, historial y waitlist.</p>
+            </div>
+            <section class="card block-card">
+              <span class="card-label">Reglas</span>
+              <ul id="rulesList" class="rules-list"></ul>
+            </section>
+            <section class="card block-card">
+              <span class="card-label">Parejas</span>
+              <div id="pairsList" class="pairs-list"></div>
+            </section>
+            <section class="card block-card">
+              <span class="card-label">Historial</span>
+              <div id="historyRoot" class="history-root"></div>
+            </section>
+          </section>
 
-          <section class="card block-card player-form-card">
-            <span class="card-label">Jugadores</span>
-            <h3>Crear Jugador</h3>
-            <form class="admin-form" id="playerForm">
-              <input id="playerId" type="hidden" />
-              <div class="player-form-note">La comparación de duplicados se hace por nombre + apellido.</div>
-              <label>
-                Nombre y apellido
-                <div class="player-name-grid">
-                  <input id="playerFirstName" type="text" placeholder="Nombre" autocomplete="given-name" required />
-                  <input id="playerLastName" type="text" placeholder="Apellido" autocomplete="family-name" required />
+          <section class="panel" id="tab-admin">
+            <div class="section-head">
+              <h2>Panel de admin</h2>
+              <p>Gestión del evento, categorías, jugadores, parejas y resultados.</p>
+            </div>
+
+            <section class="auth-card card" id="adminLock">
+              <h3>Acceso de administrador</h3>
+              <p>Requerido para gestionar el evento y sus categorías.</p>
+              <form class="auth-form" id="adminLoginForm">
+                <input id="adminUsername" type="text" autocomplete="username" placeholder="Usuario" required />
+                <input id="adminPassword" type="password" autocomplete="current-password" placeholder="Contraseña" required />
+                <button type="submit" class="primary" id="adminLoginButton">Ingresar</button>
+              </form>
+              <div id="adminLoginError" class="auth-error" hidden></div>
+            </section>
+
+            <section id="adminContent" hidden>
+              <div class="admin-session-bar card">
+                <div>
+                  <h3>Sesión activa</h3>
+                  <p>El acceso queda en esta sesión del navegador.</p>
                 </div>
-              </label>
-              <label>
-                Apodo
-                <input id="playerAlias" type="text" placeholder="Opcional" />
-              </label>
-              <button type="submit" class="primary">Guardar jugador</button>
-            </form>
-            <div class="admin-actions admin-actions-single">
-              <button type="button" class="secondary" id="openPlayersModal">Ver jugadores</button>
-            </div>
-            <div class="admin-actions admin-actions-single">
-              <button type="button" class="secondary" id="openPairsTab">Ver parejas anotadas</button>
-            </div>
+                <button type="button" class="secondary is-danger" id="adminLogout">Cerrar sesión</button>
+              </div>
+
+              <div class="admin-grid">
+                <section class="card block-card">
+                  <span class="card-label">Evento</span>
+                  <h3>Crear evento</h3>
+                  <form class="admin-form" id="eventForm">
+                    <label>
+                      Nombre del evento
+                      <input id="eventNameInput" type="text" placeholder="Opcional" />
+                    </label>
+                    <label>
+                      Fecha
+                      <input id="eventDateInput" type="date" required />
+                    </label>
+                    <label>
+                      Modo
+                      <select id="eventModeInput" required>
+                        <option value="">Seleccionar modo</option>
+                        <option value="clásico">Clásico</option>
+                        <option value="americano">Americano</option>
+                      </select>
+                    </label>
+                    <label>
+                      Lugar
+                      <input id="eventPlaceInput" type="text" placeholder="Sede o club" required />
+                    </label>
+                    <label>
+                      Categoría inicial
+                      <input id="eventCategoryNameInput" type="text" placeholder="Ej: 4ta" required />
+                    </label>
+                    <label>
+                      Cupo máximo de parejas
+                      <input id="eventMaxPairsInput" type="number" min="1" placeholder="Opcional" />
+                    </label>
+                    <button type="submit" class="primary">Crear evento</button>
+                  </form>
+                  <div class="admin-actions">
+                    <button type="button" class="secondary" id="deleteEventButton">Eliminar evento actual</button>
+                  </div>
+                </section>
+
+                <section class="card block-card">
+                  <span class="card-label">Categorías</span>
+                  <h3>Agregar categoría</h3>
+                  <div id="currentEventSummary" class="active-tournament-summary" hidden></div>
+                  <form class="admin-form" id="categoryForm">
+                    <label>
+                      Nombre de la categoría
+                      <input id="categoryNameInput" type="text" placeholder="Ej: Damas A" required />
+                    </label>
+                    <label>
+                      Cupo máximo de parejas
+                      <input id="categoryMaxPairsInput" type="number" min="1" placeholder="Opcional" />
+                    </label>
+                    <button type="submit" class="primary">Crear categoría</button>
+                  </form>
+                  <label class="inline-select">
+                    Categoría activa
+                    <select id="categorySelect"></select>
+                  </label>
+                </section>
+
+                <section class="card block-card">
+                  <span class="card-label">Jugadores</span>
+                  <h3>Crear jugador</h3>
+                  <form class="admin-form" id="playerForm">
+                    <input id="playerId" type="hidden" />
+                    <label>
+                      Nombre
+                      <input id="playerFirstName" type="text" placeholder="Nombre" required />
+                    </label>
+                    <label>
+                      Apellido
+                      <input id="playerLastName" type="text" placeholder="Apellido" required />
+                    </label>
+                    <label>
+                      Apodo
+                      <input id="playerAlias" type="text" placeholder="Opcional" />
+                    </label>
+                    <button type="submit" class="primary">Guardar jugador</button>
+                  </form>
+                  <div class="admin-actions">
+                    <button type="button" class="secondary" id="openPlayersModal">Ver jugadores</button>
+                  </div>
+                </section>
+
+                <section class="card block-card">
+                  <span class="card-label">Parejas</span>
+                  <h3>Crear pareja</h3>
+                  <form class="admin-form" id="pairForm">
+                    <input id="pairId" type="hidden" />
+                    <label>
+                      Nombre de la pareja
+                      <input id="pairName" type="text" placeholder="Opcional" />
+                    </label>
+                    <label>
+                      Jugador 1
+                      <select id="playerOneSelect" required></select>
+                    </label>
+                    <label>
+                      Jugador 2
+                      <select id="playerTwoSelect" required></select>
+                    </label>
+                    <label>
+                      Categoría
+                      <select id="pairCategorySelect" required></select>
+                    </label>
+                    <button type="submit" class="primary">Guardar pareja</button>
+                  </form>
+                  <div class="admin-actions">
+                    <button type="button" class="secondary" id="openPairsTab">Ver parejas anotadas</button>
+                  </div>
+                </section>
+
+                <section class="card block-card">
+                  <span class="card-label">Cierre</span>
+                  <h3>Planificar o archivar</h3>
+                  <label class="inline-select">
+                    Categoría a gestionar
+                    <select id="adminCategorySelect"></select>
+                  </label>
+                  <label class="inline-select">
+                    Ganador de la categoría
+                    <select id="categoryWinnerSelect"></select>
+                  </label>
+                  <div class="admin-actions two-column">
+                    <button type="button" class="secondary" id="planCategory">Planificar automáticamente</button>
+                    <button type="button" class="secondary" id="archiveCategory">Cerrar y archivar</button>
+                  </div>
+                  <div class="admin-actions">
+                    <button type="button" class="secondary" id="loadSamplePairs">Cargar parejas ficticias</button>
+                    <button type="button" class="secondary" id="clearPairs">Vaciar parejas</button>
+                  </div>
+                </section>
+
+                <section class="card block-card">
+                  <span class="card-label">Partidos</span>
+                  <h3>Editar fixture</h3>
+                  <div id="matchEditorList" class="stack-list"></div>
+                </section>
+              </div>
+            </section>
           </section>
-
-          <div class="admin-actions">
-            <button type="button" class="secondary" id="clearPairs">Vaciar parejas</button>
-            <button type="button" class="primary" id="planTournament">
-              Planificar automáticamente
-            </button>
-          </div>
-
-          <div class="admin-actions">
-            <button type="button" class="secondary" id="loadSamplePairs">Cargar parejas ficticias</button>
-          </div>
-
-          <section class="card block-card">
-            <span class="card-label">Cierre</span>
-            <h3>Declarar ganador y archivar</h3>
-            <div class="result-grid">
-              <label>
-                Ganador del torneo
-                <select id="tournamentWinner"></select>
-              </label>
-            </div>
-            <button type="button" class="primary" id="archiveTournament">
-              Cerrar torneo y archivar
-            </button>
-          </section>
-
-          <section class="placeholder">
-            <h3>Motor del torneo</h3>
-            <p>
-              Acá va la lógica de armado de grupos, cruces, tabla general y avance de fases hasta definir el ganador.
-            </p>
-          </section>
-
-          <section class="card block-card">
-            <span class="card-label">Resultados</span>
-            <h3>Carga de partidos</h3>
-            <div id="resultsList" class="stack-list"></div>
-          </section>
-          </div>
-        </section>
-
-        <section class="panel" id="tab-historial">
-          <div class="section-head">
-            <h2>Historial</h2>
-            <p>Resultados archivados ordenados por fecha más reciente.</p>
-          </div>
-
-          <section class="card block-card">
-            <div id="historyRoot" class="history-root"></div>
-          </section>
-        </section>
-      </main>
+        </main>
+      </div>
     </div>
+
+    <nav class="bottom-nav card" aria-label="Navegación principal">
+      <button class="tab is-active" data-tab="inicio">Inicio</button>
+      <button class="tab" data-tab="fixture">Fixture</button>
+      <button class="tab" data-tab="tabla">Tabla</button>
+      <button class="tab" data-tab="mas">Más</button>
+    </nav>
 
     <section class="modal-shell is-hidden" id="playersModal" hidden aria-hidden="true">
       <div class="modal-backdrop" data-modal-close></div>
-      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="playersModalTitle">
+      <div class="modal-card card" role="dialog" aria-modal="true" aria-labelledby="playersModalTitle">
         <div class="modal-head">
           <div>
             <span class="card-label">Jugadores</span>

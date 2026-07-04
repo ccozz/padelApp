@@ -1,12 +1,13 @@
 # padelApp
 
-Webapp mobile-first para gestión de torneos de padel.
+Webapp mobile-first para gestión de eventos, categorías y estadísticas de pádel.
 
 ## Modelo de datos
 - `tournaments` se conserva como nombre histórico de la tabla, pero representa el `EVENT`.
 - Cada `EVENT` tiene una o más `CATEGORIES`.
 - `players` sigue siendo global.
-- `pairs`, `groups` y `matches` pertenecen a una `category`.
+- `categories` tiene `max_pairs` para el cupo máximo.
+- `pairs`, `groups`, `matches` y `waitlist` pertenecen a una `category`.
 - `history` archiva por `category` y la API lo agrupa por `event`.
 
 ## Backend
@@ -51,6 +52,10 @@ Webapp mobile-first para gestión de torneos de padel.
 - `GET /api/categories/:id`
 - `PUT /api/categories/:id`
 - `DELETE /api/categories/:id`
+- `GET /api/categories/:id/inscriptions`
+- `POST /api/categories/:id/inscriptions`
+- `POST /api/categories/:id/waitlist`
+- `DELETE /api/categories/:id/inscriptions/:pairId`
 - `GET /api/categories/:id/pairs`
 - `GET /api/categories/:id/matches`
 - `POST /api/categories/:id/plan`
@@ -89,3 +94,4 @@ Webapp mobile-first para gestión de torneos de padel.
 - El historial devuelve eventos agrupados con sus categorías archivadas anidadas.
 - Mantener `tournaments` como tabla de eventos evita una migración destructiva sobre la base ya existente.
 - Las cuentas de jugador no se vinculan automáticamente con jugadores cargados por el admin aunque coincidan nombres.
+- La vista pública quedó separada en `Inicio`, `Fixture`, `Tabla` y `Más`, con selector de categoría para trabajar sobre cada bloque.

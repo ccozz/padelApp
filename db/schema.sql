@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS categories (
   event_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'Torneo activo',
+  max_pairs INTEGER,
   winner_pair_id TEXT,
   closed_at TEXT,
   scoring_win INTEGER NOT NULL DEFAULT 1,
@@ -90,6 +91,15 @@ CREATE TABLE IF NOT EXISTS matches (
   games_b INTEGER,
   played INTEGER NOT NULL DEFAULT 0,
   winner_id TEXT REFERENCES pairs(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS waitlist (
+  id TEXT PRIMARY KEY,
+  category_id TEXT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+  player_id TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  partner_id TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  requested_at TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pendiente', 'promovido', 'cancelado'))
 );
 
 CREATE TABLE IF NOT EXISTS history (

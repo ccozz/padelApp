@@ -124,6 +124,23 @@ const migratePlayerAccountSchema = (db) => {
   db.prepare('UPDATE players SET email_verified = COALESCE(email_verified, 0) WHERE email_verified IS NULL').run();
 };
 
+const migrateCategorySchema = (db) => {
+  const categoryColumns = getTableColumns(db, 'categories');
+  const statements = [];
+
+  if (!categoryColumns.includes('max_pairs')) {
+    statements.push('ALTER TABLE categories ADD COLUMN max_pairs INTEGER');
+  }
+
+  if (statements.length) {
+    try {
+      db.exec(statements.join(';\n') + ';');
+    } catch (error) {
+      throw new Error(`Database bootstrap failed during category schema migration: ${error.message}`);
+    }
+  }
+};
+
 const migrateLegacyTournamentModel = (db) => {
   const pairColumns = getTableColumns(db, 'pairs');
   if (!pairColumns.includes('tournament_id') || pairColumns.includes('category_id')) {
@@ -317,6 +334,12 @@ export const openDatabase = () => {
       migratePlayerAccountSchema(db);
     } catch (error) {
       throw new Error(`Database bootstrap failed during player account migration: ${error.message}`);
+    }
+
+    try {
+      migrateCategorySchema(db);
+    } catch (error) {
+      throw new Error(`Database bootstrap failed during category schema migration: ${error.message}`);
     }
 
     try {

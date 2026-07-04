@@ -2,11 +2,16 @@ import { defaultState } from './constants.js';
 
 const API_BASE = '/api';
 
+const cloneDefaultState = () => defaultState();
+
 const toTrimmedString = (value) => String(value ?? '').trim();
+const toBoolean = (value) => Boolean(value);
+const toNumber = (value, fallback = 0) => {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : fallback;
+};
 
 const isObject = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
-
-const cloneDefaultState = () => defaultState();
 
 const requestJson = async (path, options = {}) => {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -51,52 +56,46 @@ const normalizePlayerRecord = (player) => {
     lastName,
     nickname,
     fullName,
+    email: toTrimmedString(player?.email ?? '') || null,
+    emailVerified: Boolean(player?.emailVerified ?? player?.email_verified),
+    accountStatus: toTrimmedString(player?.accountStatus ?? player?.account_status ?? 'sin_cuenta'),
     createdAt: player?.createdAt ?? player?.created_at ?? null,
     updatedAt: player?.updatedAt ?? player?.updated_at ?? null,
   };
 };
 
-const normalizePairPlayer = (player) => {
-  if (!player) {
-    return null;
-  }
-
-  return normalizePlayerRecord(player);
-};
-
 const normalizePairRecord = (pair) => {
-  const playerOne = normalizePairPlayer(pair?.playerOne);
-  const playerTwo = normalizePairPlayer(pair?.playerTwo);
+  const playerOne = pair?.playerOne ? normalizePlayerRecord(pair.playerOne) : null;
+  const playerTwo = pair?.playerTwo ? normalizePlayerRecord(pair.playerTwo) : null;
 
   return {
     id: toTrimmedString(pair?.id ?? ''),
-    tournamentId: toTrimmedString(pair?.tournamentId ?? pair?.tournament_id ?? ''),
+    categoryId: toTrimmedString(pair?.categoryId ?? pair?.category_id ?? ''),
     name: toTrimmedString(pair?.name ?? ''),
     playerOneId: toTrimmedString(pair?.playerOneId ?? pair?.player_one_id ?? ''),
     playerTwoId: toTrimmedString(pair?.playerTwoId ?? pair?.player_two_id ?? ''),
     playerOne,
     playerTwo,
     players: [playerOne, playerTwo].filter(Boolean),
-    createdAt: pair?.createdAt ?? pair?.created_at ?? null,
-    updatedAt: pair?.updatedAt ?? pair?.updated_at ?? null,
   };
 };
 
 const normalizeGroupRecord = (group) => ({
   id: toTrimmedString(group?.id ?? ''),
-  tournamentId: toTrimmedString(group?.tournamentId ?? group?.tournament_id ?? ''),
+  categoryId: toTrimmedString(group?.categoryId ?? group?.category_id ?? ''),
   name: toTrimmedString(group?.name ?? ''),
-  pairIds: Array.isArray(group?.pairIds) ? group.pairIds.map((value) => toTrimmedString(value)).filter(Boolean) : [],
+  pairIds: Array.isArray(group?.pairIds ?? group?.pair_ids) ? (group?.pairIds ?? group?.pair_ids).map((value) => toTrimmedString(value)).filter(Boolean) : [],
+  pairs: Array.isArray(group?.pairs) ? group.pairs.map(normalizePairRecord) : [],
 });
 
 const normalizeMatchRecord = (match) => ({
   id: toTrimmedString(match?.id ?? ''),
-  tournamentId: toTrimmedString(match?.tournamentId ?? match?.tournament_id ?? ''),
+  categoryId: toTrimmedString(match?.categoryId ?? match?.category_id ?? ''),
   stage: toTrimmedString(match?.stage ?? ''),
   pairAId: toTrimmedString(match?.pairAId ?? match?.pair_a_id ?? ''),
   pairBId: toTrimmedString(match?.pairBId ?? match?.pair_b_id ?? ''),
-  pairALabel: toTrimmedString(match?.pairALabel ?? ''),
-  pairBLabel: toTrimmedString(match?.pairBLabel ?? ''),
+  pairALabel: toTrimmedString(match?.pairALabel ?? match?.pair_a_label ?? ''),
+  pairBLabel: toTrimmedString(match?.pairBLabel ?? match?.pair_b_label ?? ''),
   date: toTrimmedString(match?.date ?? ''),
   time: toTrimmedString(match?.time ?? ''),
   venue: toTrimmedString(match?.venue ?? ''),
@@ -107,83 +106,147 @@ const normalizeMatchRecord = (match) => ({
   gamesA: match?.gamesA ?? match?.games_a ?? null,
   gamesB: match?.gamesB ?? match?.games_b ?? null,
   winnerId: toTrimmedString(match?.winnerId ?? match?.winner_id ?? ''),
-  played: Boolean(match?.played),
+  played: toBoolean(match?.played),
+  roundName: toTrimmedString(match?.roundName ?? ''),
 });
 
-const normalizeTournamentRecord = (tournament) => ({
-  id: toTrimmedString(tournament?.id ?? ''),
-  name: toTrimmedString(tournament?.name ?? ''),
-  date: toTrimmedString(tournament?.date ?? ''),
-  mode: toTrimmedString(tournament?.mode ?? ''),
-  place: toTrimmedString(tournament?.place ?? ''),
-  status: toTrimmedString(tournament?.status ?? ''),
-  createdAt: tournament?.createdAt ?? tournament?.created_at ?? null,
-  winnerId: toTrimmedString(tournament?.winnerId ?? tournament?.winner_id ?? ''),
-  closedAt: tournament?.closedAt ?? tournament?.closed_at ?? null,
+const normalizeWaitlistRecord = (entry) => ({
+  id: toTrimmedString(entry?.id ?? ''),
+  categoryId: toTrimmedString(entry?.categoryId ?? entry?.category_id ?? ''),
+  playerId: toTrimmedString(entry?.playerId ?? entry?.player_id ?? ''),
+  partnerId: toTrimmedString(entry?.partnerId ?? entry?.partner_id ?? ''),
+  requestedAt: toTrimmedString(entry?.requestedAt ?? entry?.requested_at ?? ''),
+  status: toTrimmedString(entry?.status ?? ''),
+  player: entry?.player ? normalizePlayerRecord(entry.player) : null,
+  partner: entry?.partner ? normalizePlayerRecord(entry.partner) : null,
+});
+
+const normalizeCategoryRecord = (category) => ({
+  id: toTrimmedString(category?.id ?? ''),
+  eventId: toTrimmedString(category?.eventId ?? category?.event_id ?? ''),
+  name: toTrimmedString(category?.name ?? ''),
+  status: toTrimmedString(category?.status ?? ''),
+  maxPairs: category?.maxPairs ?? category?.max_pairs ?? null,
+  winnerPairId: toTrimmedString(category?.winnerPairId ?? category?.winner_pair_id ?? ''),
+  closedAt: category?.closedAt ?? category?.closed_at ?? null,
   scoring: {
-    win: Number(tournament?.scoring?.win ?? tournament?.scoring_win ?? 1),
-    loss: Number(tournament?.scoring?.loss ?? tournament?.scoring_loss ?? 0),
-    noShow: Number(tournament?.scoring?.noShow ?? tournament?.scoring_no_show ?? 0),
+    win: toNumber(category?.scoring?.win ?? category?.scoring_win, 1),
+    loss: toNumber(category?.scoring?.loss ?? category?.scoring_loss, 0),
+    noShow: toNumber(category?.scoring?.noShow ?? category?.scoring_no_show, 0),
   },
-  rulesVersion: Number(tournament?.rulesVersion ?? tournament?.rules_version ?? 1),
+  rulesVersion: toNumber(category?.rulesVersion ?? category?.rules_version, 1),
 });
 
-const normalizeHistoryEntry = (entry) => {
-  const snapshot = entry?.snapshot ?? {};
-  const tournament = normalizeTournamentRecord(snapshot.tournament ?? entry.tournament ?? {});
-  const pairs = Array.isArray(snapshot.pairs ?? entry.pairs) ? (snapshot.pairs ?? entry.pairs).map(normalizePairRecord) : [];
-  const matches = Array.isArray(snapshot.matches ?? entry.matches) ? (snapshot.matches ?? entry.matches).map(normalizeMatchRecord) : [];
+const normalizeHistoryCategory = (entry) => ({
+  category: normalizeCategoryRecord(entry?.category ?? {}),
+  archivedAt: toTrimmedString(entry?.archivedAt ?? entry?.archived_at ?? ''),
+  snapshot: entry?.snapshot ?? null,
+});
+
+const normalizeHistoryEntry = (entry) => ({
+  event: normalizeEventRecord(entry?.event ?? {}),
+  categories: Array.isArray(entry?.categories) ? entry.categories.map(normalizeHistoryCategory) : [],
+});
+
+const normalizeCategoryBundle = (bundle) => {
+  const category = normalizeCategoryRecord(bundle?.category ?? bundle ?? {});
 
   return {
-    id: toTrimmedString(entry?.id ?? snapshot?.id ?? tournament.id ?? ''),
-    tournamentId: toTrimmedString(entry?.tournamentId ?? entry?.tournament_id ?? tournament.id ?? ''),
-    archivedAt: toTrimmedString(entry?.archivedAt ?? entry?.archived_at ?? tournament.closedAt ?? tournament.createdAt ?? ''),
-    tournament,
-    pairs,
-    matches,
-    standings: Array.isArray(snapshot.standings) ? snapshot.standings : [],
-    bracket: Array.isArray(snapshot.bracket) ? snapshot.bracket : [],
-    bracketResults: Array.isArray(snapshot.bracketResults) ? snapshot.bracketResults : [],
-    bracketChampion: snapshot.bracketChampion ?? null,
-    snapshot,
-    winnerId: toTrimmedString(entry?.winnerId ?? snapshot?.tournament?.winnerId ?? tournament.winnerId ?? ''),
-    tournamentName: toTrimmedString(entry?.tournamentName ?? tournament.name ?? ''),
-    tournamentDate: toTrimmedString(entry?.tournamentDate ?? tournament.date ?? ''),
-    tournamentMode: toTrimmedString(entry?.tournamentMode ?? tournament.mode ?? ''),
-    tournamentPlace: toTrimmedString(entry?.tournamentPlace ?? tournament.place ?? ''),
-    winnerName: toTrimmedString(entry?.winnerName ?? ''),
+    ...category,
+    pairs: Array.isArray(bundle?.pairs) ? bundle.pairs.map(normalizePairRecord) : [],
+    groups: Array.isArray(bundle?.groups) ? bundle.groups.map(normalizeGroupRecord) : [],
+    matches: Array.isArray(bundle?.matches) ? bundle.matches.map(normalizeMatchRecord) : [],
+    standings: Array.isArray(bundle?.standings) ? bundle.standings : [],
+    bracket: Array.isArray(bundle?.bracket) ? bundle.bracket : [],
+    bracketResults: Array.isArray(bundle?.bracketResults) ? bundle.bracketResults : [],
+    bracketChampion: bundle?.bracketChampion ?? null,
+    waitlist: Array.isArray(bundle?.waitlist) ? bundle.waitlist.map(normalizeWaitlistRecord) : [],
   };
 };
+
+const normalizeEventRecord = (event) => ({
+  id: toTrimmedString(event?.id ?? ''),
+  name: toTrimmedString(event?.name ?? ''),
+  date: toTrimmedString(event?.date ?? ''),
+  mode: toTrimmedString(event?.mode ?? ''),
+  place: toTrimmedString(event?.place ?? ''),
+  status: toTrimmedString(event?.status ?? ''),
+  createdAt: event?.createdAt ?? event?.created_at ?? null,
+  winnerId: toTrimmedString(event?.winnerId ?? event?.winner_id ?? ''),
+  closedAt: event?.closedAt ?? event?.closed_at ?? null,
+  scoring: {
+    win: toNumber(event?.scoring?.win ?? event?.scoring_win, 1),
+    loss: toNumber(event?.scoring?.loss ?? event?.scoring_loss, 0),
+    noShow: toNumber(event?.scoring?.noShow ?? event?.scoring_no_show, 0),
+  },
+  rulesVersion: toNumber(event?.rulesVersion ?? event?.rules_version, 1),
+});
 
 const normalizeList = (items, normalizer) => (Array.isArray(items) ? items.map(normalizer) : []);
 
-export const loadState = async () => {
-  const [bundle, playersResponse, pairsResponse, historyResponse] = await Promise.all([
-    requestJson('/tournaments/current'),
-    requestJson('/players'),
-    requestJson('/pairs'),
-    requestJson('/history'),
-  ]);
+const pickSelectedCategoryId = (categories) =>
+  categories.find((category) => category.status !== 'Torneo archivado')?.id || categories[0]?.id || null;
 
-  const fallbackPlayers = normalizeList(playersResponse, normalizePlayerRecord);
-  const fallbackPairs = normalizeList(pairsResponse, normalizePairRecord);
-  const bundlePlayers = normalizeList(bundle?.players, normalizePlayerRecord);
-  const bundlePairs = normalizeList(bundle?.pairs, normalizePairRecord);
+export const loadState = async () => {
+  const [bundle, historyResponse] = await Promise.all([requestJson('/events/current'), requestJson('/history')]);
+  const event = normalizeEventRecord(bundle?.event ?? {});
+  const players = normalizeList(bundle?.players, normalizePlayerRecord);
+  const categories = normalizeList(bundle?.categories, normalizeCategoryBundle);
+  const selectedCategoryId = pickSelectedCategoryId(categories);
+
+  const selectedCategory = categories.find((category) => category.id === selectedCategoryId) || null;
 
   return {
     ...cloneDefaultState(),
-    tournament: bundle?.tournament ? normalizeTournamentRecord(bundle.tournament) : cloneDefaultState().tournament,
-    players: bundlePlayers.length ? bundlePlayers : fallbackPlayers,
-    pairs: bundlePairs.length ? bundlePairs : fallbackPairs,
-    groups: normalizeList(bundle?.groups, normalizeGroupRecord),
-    matches: normalizeList(bundle?.matches, normalizeMatchRecord),
-    standings: Array.isArray(bundle?.standings) ? bundle.standings : [],
-    bracket: Array.isArray(bundle?.bracket) ? bundle.bracket : [],
+    event,
+    players,
+    categories,
+    selectedCategoryId,
+    selectedCategory,
+    pairs: selectedCategory?.pairs || [],
+    groups: selectedCategory?.groups || [],
+    matches: selectedCategory?.matches || [],
+    standings: selectedCategory?.standings || [],
+    bracket: selectedCategory?.bracket || [],
+    bracketResults: selectedCategory?.bracketResults || [],
+    bracketChampion: selectedCategory?.bracketChampion || null,
     history: normalizeList(historyResponse, normalizeHistoryEntry),
-    bracketResults: Array.isArray(bundle?.bracketResults) ? bundle.bracketResults : [],
-    bracketChampion: bundle?.bracketChampion ?? null,
   };
 };
+
+export const createEvent = (payload) =>
+  requestJson('/events', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const updateEvent = (id, payload) =>
+  requestJson(`/events/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+
+export const deleteEvent = (id) =>
+  requestJson(`/events/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+
+export const createCategory = (eventId, payload) =>
+  requestJson(`/events/${encodeURIComponent(eventId)}/categories`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const updateCategory = (id, payload) =>
+  requestJson(`/categories/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+
+export const deleteCategory = (id) =>
+  requestJson(`/categories/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
 
 export const createPlayer = (payload) =>
   requestJson('/players', {
@@ -219,32 +282,15 @@ export const deletePair = (id) =>
     method: 'DELETE',
   });
 
-export const createTournament = (payload) =>
-  requestJson('/tournaments', {
+export const planCategory = (id) =>
+  requestJson(`/categories/${encodeURIComponent(id)}/plan`, {
+    method: 'POST',
+  });
+
+export const archiveCategory = (id, payload = {}) =>
+  requestJson(`/categories/${encodeURIComponent(id)}/archive`, {
     method: 'POST',
     body: JSON.stringify(payload),
-  });
-
-export const updateTournament = (id, payload) =>
-  requestJson(`/tournaments/${encodeURIComponent(id)}`, {
-    method: 'PUT',
-    body: JSON.stringify(payload),
-  });
-
-export const deleteTournament = (id) =>
-  requestJson(`/tournaments/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-  });
-
-export const planTournament = (id) =>
-  requestJson(`/tournaments/${encodeURIComponent(id)}/plan`, {
-    method: 'POST',
-  });
-
-export const archiveTournament = (id, winnerId) =>
-  requestJson(`/tournaments/${encodeURIComponent(id)}/archive`, {
-    method: 'POST',
-    body: JSON.stringify({ winnerId }),
   });
 
 export const updateMatch = (id, payload) =>
@@ -253,12 +299,32 @@ export const updateMatch = (id, payload) =>
     body: JSON.stringify(payload),
   });
 
+export const getCategoryInscriptionState = (id) =>
+  requestJson(`/categories/${encodeURIComponent(id)}/inscriptions`);
+
+export const inscribeCategory = (id, partnerId) =>
+  requestJson(`/categories/${encodeURIComponent(id)}/inscriptions`, {
+    method: 'POST',
+    body: JSON.stringify({ partnerId }),
+  });
+
+export const addToWaitlist = (id, partnerId) =>
+  requestJson(`/categories/${encodeURIComponent(id)}/waitlist`, {
+    method: 'POST',
+    body: JSON.stringify({ partnerId }),
+  });
+
+export const revokeInscription = (categoryId, pairId) =>
+  requestJson(`/categories/${encodeURIComponent(categoryId)}/inscriptions/${encodeURIComponent(pairId)}`, {
+    method: 'DELETE',
+  });
+
 export const createId = () => {
   if (window.crypto?.randomUUID) {
     return window.crypto.randomUUID();
   }
 
-  return `pair-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
 export const normalizeText = (value) => String(value ?? '').trim().replace(/\s+/g, ' ');

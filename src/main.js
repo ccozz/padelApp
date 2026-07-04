@@ -1,98 +1,106 @@
 import { defaultState, rules } from './constants.js';
 import { forceLockAdmin, isAdminUnlocked, lockAdmin, syncAdminSession, unlockAdmin } from './auth.js';
 import {
-  archiveTournament as archiveTournamentApi,
-  createId,
-  createPair as createPairApi,
-  createPlayer as createPlayerApi,
-  createTournament as createTournamentApi,
-  deletePair as deletePairApi,
-  deletePlayer as deletePlayerApi,
-  deleteTournament as deleteTournamentApi,
+  archiveCategory,
+  createCategory,
+  createEvent,
+  createPair,
+  createPlayer,
+  deleteEvent,
+  deletePair,
+  deletePlayer,
   loadState,
   normalizeText,
-  planTournament as planTournamentApi,
-  updateMatch as updateMatchApi,
-  updatePair as updatePairApi,
-  updatePlayer as updatePlayerApi,
-  updateTournament as updateTournamentApi,
+  planCategory,
+  updateMatch,
+  updatePair,
+  updatePlayer,
 } from './storage.js';
-import {
-  buildBalancedCrossGroupFixtures,
-  buildBalancedGroups,
-  buildKnockoutBracket,
-  buildStandings,
-  flattenBracket,
-  resolveBracketWinner,
-} from './tournament.js';
 
-const tabButtons = document.querySelectorAll('.tab');
+const tabButtons = document.querySelectorAll('[data-tab]');
 const panels = document.querySelectorAll('.panel');
-const rulesList = document.getElementById('rulesList');
-const pairsList = document.getElementById('pairsList');
+
+const eventNameDesktop = document.getElementById('eventName');
+const eventNameMobile = document.getElementById('eventNameMobile');
+const eventSubtitleDesktop = document.getElementById('eventSubtitle');
+const eventSubtitleMobile = document.getElementById('eventSubtitleMobile');
+const eventStatus = document.getElementById('eventStatus');
+const eventMeta = document.getElementById('eventMeta');
+const categoryRail = document.getElementById('categoryRail');
+const overviewList = document.getElementById('overviewList');
+const fixtureCategoryTitle = document.getElementById('fixtureCategoryTitle');
+const fixtureCategoryMeta = document.getElementById('fixtureCategoryMeta');
+const fixtureList = document.getElementById('fixtureList');
+const tableCategoryTitle = document.getElementById('tableCategoryTitle');
+const tableCategoryMeta = document.getElementById('tableCategoryMeta');
 const groupsList = document.getElementById('groupsList');
-const matchesList = document.getElementById('matchesList');
 const standingsList = document.getElementById('standingsList');
-const podiumList = document.getElementById('podiumList');
-const podiumSection = document.getElementById('podiumSection');
 const bracketList = document.getElementById('bracketList');
 const bracketResultsList = document.getElementById('bracketResultsList');
-const tournamentInfoTitle = document.getElementById('tournamentInfoTitle');
-const tournamentInfoMeta = document.getElementById('tournamentInfoMeta');
-
-const isTournamentFinalized = () => {
-  const currentState = getState();
-  return Boolean(currentState.tournament.closedAt) || currentState.tournament.status === 'Torneo archivado';
-};
-
-const getFinalWinnerId = (state) => state?.bracketChampion?.winnerId || state?.tournament?.winnerId || null;
-
-const canArchiveTournament = () => {
-  const currentState = getState();
-  return Boolean(getFinalWinnerId(currentState)) && !isTournamentFinalized();
-};
-const resultsList = document.getElementById('resultsList');
-const fixtureStatusFilter = document.getElementById('fixtureStatusFilter');
-const fixturePlayerFilter = document.getElementById('fixturePlayerFilter');
-const tournamentWinner = document.getElementById('tournamentWinner');
-const pairsCount = document.getElementById('pairsCount');
-const tournamentStatus = document.getElementById('tournamentStatus');
-const pairForm = document.getElementById('pairForm');
-const clearPairs = document.getElementById('clearPairs');
-const planTournament = document.getElementById('planTournament');
-const archiveTournament = document.getElementById('archiveTournament');
-const loadSamplePairs = document.getElementById('loadSamplePairs');
-const pairId = document.getElementById('pairId');
-const pairName = document.getElementById('pairName');
-const playerOneSelect = document.getElementById('playerOneSelect');
-const playerTwoSelect = document.getElementById('playerTwoSelect');
-const playersList = document.getElementById('playersList');
-const playersModal = document.getElementById('playersModal');
-const openPlayersModal = document.getElementById('openPlayersModal');
-const closePlayersModal = document.getElementById('closePlayersModal');
-const openPairsTab = document.getElementById('openPairsTab');
+const rulesList = document.getElementById('rulesList');
+const pairsList = document.getElementById('pairsList');
+const historyRoot = document.getElementById('historyRoot');
+const appError = document.getElementById('appError');
+const adminLock = document.getElementById('adminLock');
+const adminContent = document.getElementById('adminContent');
+const adminLoginForm = document.getElementById('adminLoginForm');
+const adminUsername = document.getElementById('adminUsername');
+const adminPassword = document.getElementById('adminPassword');
+const adminLoginError = document.getElementById('adminLoginError');
+const adminLogout = document.getElementById('adminLogout');
+const themeToggle = document.getElementById('themeToggle');
+const themeToggleMobile = document.getElementById('themeToggleMobile');
+const eventForm = document.getElementById('eventForm');
+const eventNameInput = document.getElementById('eventNameInput');
+const eventDateInput = document.getElementById('eventDateInput');
+const eventModeInput = document.getElementById('eventModeInput');
+const eventPlaceInput = document.getElementById('eventPlaceInput');
+const eventCategoryNameInput = document.getElementById('eventCategoryNameInput');
+const eventMaxPairsInput = document.getElementById('eventMaxPairsInput');
+const deleteEventButton = document.getElementById('deleteEventButton');
+const categoryForm = document.getElementById('categoryForm');
+const categoryNameInput = document.getElementById('categoryNameInput');
+const categoryMaxPairsInput = document.getElementById('categoryMaxPairsInput');
+const categorySelect = document.getElementById('categorySelect');
+const adminCategorySelect = document.getElementById('adminCategorySelect');
+const pairCategorySelect = document.getElementById('pairCategorySelect');
+const categoryWinnerSelect = document.getElementById('categoryWinnerSelect');
+const currentEventSummary = document.getElementById('currentEventSummary');
 const playerForm = document.getElementById('playerForm');
 const playerId = document.getElementById('playerId');
 const playerFirstName = document.getElementById('playerFirstName');
 const playerLastName = document.getElementById('playerLastName');
 const playerAlias = document.getElementById('playerAlias');
-const tournamentForm = document.getElementById('tournamentForm');
-const tournamentDate = document.getElementById('tournamentDate');
-const tournamentMode = document.getElementById('tournamentMode');
-const tournamentPlace = document.getElementById('tournamentPlace');
-const deleteCurrentTournament = document.getElementById('deleteCurrentTournament');
-const adminLock = document.getElementById('adminLock');
-const adminContent = document.getElementById('adminContent');
-const adminLoginForm = document.getElementById('adminLoginForm');
-const adminLoginButton = document.getElementById('adminLoginButton');
-const adminPassword = document.getElementById('adminPassword');
-const adminUsername = document.getElementById('adminUsername');
-const adminLoginError = document.getElementById('adminLoginError');
-const appError = document.getElementById('appError');
-const adminLogout = document.getElementById('adminLogout');
-const adminTab = [...tabButtons].find((button) => button.dataset.tab === 'admin');
+const pairForm = document.getElementById('pairForm');
+const pairId = document.getElementById('pairId');
+const pairName = document.getElementById('pairName');
+const playerOneSelect = document.getElementById('playerOneSelect');
+const playerTwoSelect = document.getElementById('playerTwoSelect');
+const planCategoryButton = document.getElementById('planCategory');
+const archiveCategoryButton = document.getElementById('archiveCategory');
+const loadSamplePairsButton = document.getElementById('loadSamplePairs');
+const clearPairsButton = document.getElementById('clearPairs');
+const openPlayersModal = document.getElementById('openPlayersModal');
+const openPairsTab = document.getElementById('openPairsTab');
+const playersModal = document.getElementById('playersModal');
+const playersList = document.getElementById('playersList');
+const closePlayersModal = document.getElementById('closePlayersModal');
+const matchEditorList = document.getElementById('matchEditorList');
 
 let appState = defaultState();
+let activeTab = 'inicio';
+let selectedCategoryId = null;
+let themeMode = localStorage.getItem('padelApp.theme') || '';
+
+const escapeHtml = (value) =>
+  String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+
+const toTrimmedString = (value) => String(value ?? '').trim();
 
 const setAppError = (message = '') => {
   if (!appError) {
@@ -109,1108 +117,143 @@ const setAppError = (message = '') => {
   appError.textContent = message;
 };
 
-const setFormBusy = (form, busy) => {
-  if (!form) {
+const setAdminLoginError = (message = '') => {
+  if (!adminLoginError) {
     return;
   }
 
-  form.querySelectorAll('button[type="submit"]').forEach((button) => {
-    button.disabled = busy;
+  if (!message) {
+    adminLoginError.hidden = true;
+    adminLoginError.textContent = '';
+    return;
+  }
+
+  adminLoginError.hidden = false;
+  adminLoginError.textContent = message;
+};
+
+const setBusy = (container, busy) => {
+  if (!container) {
+    return;
+  }
+
+  container.querySelectorAll('button, input, select, textarea').forEach((control) => {
+    if (control.id === 'adminLogout' && !busy) {
+      return;
+    }
+
+    control.disabled = busy;
   });
 };
 
-const withButtonBusy = async (button, task) => {
-  if (button) {
-    button.disabled = true;
+const setTheme = (nextTheme) => {
+  themeMode = nextTheme || '';
+
+  if (themeMode) {
+    document.body.dataset.theme = themeMode;
+    localStorage.setItem('padelApp.theme', themeMode);
+  } else {
+    delete document.body.dataset.theme;
+    localStorage.removeItem('padelApp.theme');
   }
 
-  try {
-    return await task();
-  } finally {
-    if (button) {
-      button.disabled = false;
-    }
+  const label = themeMode ? `Tema: ${themeMode}` : 'Tema sistema';
+  if (themeToggle) {
+    themeToggle.textContent = label;
+  }
+  if (themeToggleMobile) {
+    themeToggleMobile.textContent = label;
   }
 };
 
-window.adminLoginSubmit = async (event) => {
-  event?.preventDefault?.();
-  event?.stopImmediatePropagation?.();
-
-  if (adminLoginError) {
-    adminLoginError.hidden = true;
-    adminLoginError.textContent = '';
+const toggleTheme = () => {
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  if (!themeMode) {
+    setTheme(prefersDark ? 'light' : 'dark');
+    return;
   }
 
-  const username = normalizeText(adminUsername?.value || '');
-  const password = String(adminPassword?.value || '');
-  const submitButton = adminLoginForm?.querySelector('button[type="submit"], button[type="button"]');
-
-  if (!username || !password) {
-    if (adminLoginError) {
-      adminLoginError.hidden = false;
-      adminLoginError.textContent = 'Ingresá usuario y contraseña.';
-    }
-    return false;
-  }
-
-  if (submitButton) {
-    submitButton.disabled = true;
-  }
-
-  try {
-    await unlockAdmin(username, password);
-    if (adminPassword) {
-      adminPassword.value = '';
-    }
-    if (adminLock) {
-      adminLock.hidden = true;
-    }
-    if (adminContent) {
-      adminContent.hidden = false;
-    }
-    if (adminTab) {
-      adminTab.classList.add('is-active');
-    }
-    setAppError('');
-    renderAll();
-    syncTournamentCreationState();
-    syncAdminTwoColumnLayout();
-    syncAdminFormLabels();
-    setActiveTab('admin');
-  } catch (error) {
-    if (adminLoginError) {
-      adminLoginError.hidden = false;
-      adminLoginError.textContent = error?.status === 401 ? 'Credenciales inválidas.' : error?.message || 'No se pudo iniciar sesión.';
-    }
-  } finally {
-    if (submitButton) {
-      submitButton.disabled = false;
-    }
-  }
-
-  return false;
+  setTheme(themeMode === 'dark' ? 'light' : 'dark');
 };
 
-adminLoginForm?.addEventListener('submit', window.adminLoginSubmit, true);
-
-adminLogout?.addEventListener(
-  'click',
-  async (event) => {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    await lockAdmin();
-    if (adminLock) {
-      adminLock.hidden = false;
-    }
-    if (adminContent) {
-      adminContent.hidden = true;
-    }
-    renderAll();
-    setActiveTab('admin');
-  },
-  true,
-);
-
-const getState = () => appState;
-
-const rebuildDerivedState = (state) => {
-  const standings = buildStandings(state.pairs, state.matches);
-  const bracket = buildKnockoutBracket(standings, state.pairs, 8);
-  const bracketOutcome = resolveBracketWinner(bracket, state.bracketResults || [], state.pairs);
-
-  return {
-    ...state,
-    standings,
-    bracket,
-    bracketResolved: bracketOutcome.played,
-    bracketChampion: bracketOutcome.champion,
-  };
-};
-
-const setState = (nextState) => {
-  appState = rebuildDerivedState(nextState);
-  renderAll();
-};
-
-const refreshState = async () => {
-  appState = rebuildDerivedState(await loadState());
-  renderAll();
-};
-
-const getPairMap = (pairs) => new Map(pairs.map((pair) => [pair.id, pair]));
-const getPlayerMap = (players) => new Map(players.map((player) => [player.id, player]));
-
-const getPlayerName = (players, playerIdValue, fallback = '') =>
-  players.find((player) => player.id === playerIdValue)?.fullName || fallback || '';
-
-const getPlayerDisplayName = (player) => {
-  if (!player) {
-    return '';
-  }
-
-  if (player.nickname) {
-    return `${player.nickname} (${[player.firstName, player.lastName].filter(Boolean).join(' ').trim()})`;
-  }
-
-  return [player.firstName, player.lastName].filter(Boolean).join(' ').trim() || player.fullName || '';
-};
-
-const getPlayerGroupLabel = (player) => {
-  if (!player) {
-    return '';
-  }
-
-  return player.nickname || [player.firstName, player.lastName].filter(Boolean).join(' ').trim() || player.fullName || '';
-};
-
-const getPlayerSearchBlob = (player) =>
-  [player?.firstName, player?.lastName, player?.nickname, player?.fullName]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-
-const formatTournamentMode = (mode) => {
-  if (mode === 'clasico') {
-    return 'Clásico';
-  }
-
-  if (mode === 'americano') {
-    return 'Americano';
-  }
-
-  return mode || 'Sin modo';
-};
-
-const hasActiveTournament = (state) =>
-  Boolean(state.tournament.createdAt) && state.tournament.status !== 'Torneo archivado';
-
-const canEditTournament = () => isAdminUnlocked() && !isTournamentFinalized();
-
-const findSharedAncestor = (leftNode, rightNode) => {
-  const ancestors = new Set();
-  let current = leftNode;
-  while (current) {
-    ancestors.add(current);
-    current = current.parentElement;
-  }
-
-  current = rightNode;
-  while (current) {
-    if (ancestors.has(current)) {
-      return current;
-    }
-    current = current.parentElement;
-  }
-
-  return null;
-};
-
-const getTournamentDateLabel = (dateValue) => {
+const formatDateLabel = (dateValue) => {
   if (!dateValue) {
     return 'Sin fecha';
   }
 
   const date = new Date(`${dateValue}T00:00:00`);
   if (Number.isNaN(date.getTime())) {
-    return 'Sin fecha';
+    return toTrimmedString(dateValue);
   }
 
-  return date.toLocaleDateString('es-AR');
+  return new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
 };
 
-const formatInputDate = (dateValue) => {
-  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-
-  return date.toISOString().slice(0, 10);
+const formatDateTimeLabel = (dateValue, timeValue) => {
+  const dateLabel = formatDateLabel(dateValue);
+  return timeValue ? `${dateLabel} · ${timeValue}` : dateLabel;
 };
 
-const formatTournamentActiveLabel = (place, dateValue) => {
-  const placeLabel = (place || 'Sede').trim();
-  const dateLabel = getTournamentDateLabel(dateValue).replaceAll('/', '-');
+const getPlayerLabel = (player) => {
+  if (!player) {
+    return 'Jugador';
+  }
 
-  return `TORNEO EN ${placeLabel.toUpperCase()} ${dateLabel}`;
+  return player.nickname ? player.nickname : player.fullName || [player.firstName, player.lastName].filter(Boolean).join(' ');
 };
 
-const syncAdminTwoColumnLayout = () => {};
-
-const syncAdminFormLabels = () => {
-  const playerHeading = playerForm?.closest('.player-form-card')?.querySelector('h3') || playerForm?.parentElement?.querySelector?.('h3');
-  const pairHeading = pairForm?.closest('.pair-form-card')?.querySelector('h3') || pairForm?.parentElement?.querySelector?.('h3');
-
-  if (playerHeading) {
-    playerHeading.textContent = 'Crear Jugador';
+const getPairLabel = (pair) => {
+  if (!pair) {
+    return 'Pareja';
   }
 
-  if (pairHeading) {
-    pairHeading.textContent = 'Crear pareja';
-  }
-
-  const pairSubmit = pairForm?.querySelector('button[type="submit"]');
-  if (pairSubmit) {
-    pairSubmit.textContent = 'Guardar pareja';
-  }
+  return pair.name || [getPlayerLabel(pair.playerOne), getPlayerLabel(pair.playerTwo)].filter(Boolean).join(' / ');
 };
 
-const syncTournamentCreationState = () => {
-  if (!tournamentForm) {
+const getSelectedCategory = () =>
+  appState.categories.find((category) => category.id === selectedCategoryId) ||
+  appState.selectedCategory ||
+  appState.categories[0] ||
+  null;
+
+const normalizeLoadedState = (loadedState) => {
+  const categories = Array.isArray(loadedState.categories) ? loadedState.categories : [];
+  const preservedCategoryId = selectedCategoryId && categories.some((category) => category.id === selectedCategoryId) ? selectedCategoryId : null;
+  const nextSelectedCategoryId = preservedCategoryId || loadedState.selectedCategoryId || categories.find((category) => category.status !== 'Torneo archivado')?.id || categories[0]?.id || null;
+  const selectedCategory = categories.find((category) => category.id === nextSelectedCategoryId) || null;
+
+  return {
+    ...loadedState,
+    categories,
+    selectedCategoryId: nextSelectedCategoryId,
+    selectedCategory,
+    pairs: selectedCategory?.pairs || [],
+    groups: selectedCategory?.groups || [],
+    matches: selectedCategory?.matches || [],
+    standings: selectedCategory?.standings || [],
+    bracket: selectedCategory?.bracket || [],
+    bracketResults: selectedCategory?.bracketResults || [],
+    bracketChampion: selectedCategory?.bracketChampion || null,
+  };
+};
+
+const reloadState = async () => {
+  const loadedState = await loadState();
+  appState = normalizeLoadedState(loadedState);
+};
+
+const setSelectedCategoryId = (categoryId) => {
+  if (!categoryId || !appState.categories.some((category) => category.id === categoryId)) {
     return;
   }
 
-  const state = getState();
-  const activeTournament = hasActiveTournament(state);
-  const tournament = state.tournament || {};
-  const summaryId = 'currentTournamentSummary';
-  let summary = document.getElementById(summaryId);
-
-  if (activeTournament) {
-    const summaryLabel = formatTournamentActiveLabel(tournament.place, tournament.date);
-    const dateLabel = getTournamentDateLabel(tournament.date);
-
-    if (summary) {
-      summary.hidden = false;
-      summary.innerHTML = `
-        <div class="active-tournament-summary-head">
-          <div>
-            <p class="eyebrow">Torneo activo</p>
-            <h3>${escapeHtml(summaryLabel)}</h3>
-            <p class="muted">${escapeHtml(dateLabel)} · ${escapeHtml(formatTournamentMode(tournament.mode))} · ${escapeHtml(tournament.place || 'Sin lugar')}</p>
-          </div>
-        </div>
-        <div class="active-tournament-actions">
-          <button type="button" id="currentTournamentEdit" class="secondary-action">Editar torneo</button>
-          <button type="button" id="currentTournamentDelete" class="danger-action">Borrar torneo</button>
-        </div>
-      `;
-    }
-
-    tournamentForm.hidden = true;
-    tournamentForm.classList.add('is-collapsed');
-  } else {
-    if (summary) {
-      summary.hidden = true;
-      summary.innerHTML = '';
-    }
-
-    tournamentForm.hidden = false;
-    tournamentForm.classList.remove('is-collapsed');
-  }
-
-  const submitButton = tournamentForm.querySelector('button[type="submit"]');
-  if (submitButton) {
-    submitButton.textContent = activeTournament ? 'Guardar torneo' : 'Crear torneo';
-  }
-
-  document.getElementById('currentTournamentEdit')?.addEventListener('click', () => {
-    tournamentForm.hidden = false;
-    tournamentForm.classList.remove('is-collapsed');
-    tournamentForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, { once: true });
-
-  document.getElementById('currentTournamentDelete')?.addEventListener('click', () => {
-    deleteCurrentTournament?.click();
-  }, { once: true });
-
-  syncAdminTwoColumnLayout();
-};
-
-window.addEventListener('load', () => {
-  syncTournamentCreationState();
-  syncAdminTwoColumnLayout();
-  syncAdminFormLabels();
-});
-
-const isAdminTabActive = () => document.getElementById('tab-admin')?.classList.contains('is-active');
-
-const openPlayersModalView = () => {
-  if (!playersModal) {
-    return;
-  }
-
-  playersModal.hidden = false;
-  playersModal.classList.remove('is-hidden');
-  playersModal.setAttribute('aria-hidden', 'false');
-};
-
-const closePlayersModalView = () => {
-  if (!playersModal) {
-    return;
-  }
-
-  playersModal.hidden = true;
-  playersModal.classList.add('is-hidden');
-  playersModal.setAttribute('aria-hidden', 'true');
-};
-
-const getMatchWinnerFromScore = (match, setsA, setsB, gamesA, gamesB) => {
-  if (!match) {
-    return null;
-  }
-
-  if (setsA > setsB) {
-    return match.pairAId;
-  }
-
-  if (setsB > setsA) {
-    return match.pairBId;
-  }
-
-  if (gamesA > gamesB) {
-    return match.pairAId;
-  }
-
-  if (gamesB > gamesA) {
-    return match.pairBId;
-  }
-
-  return null;
-};
-
-const buildHistorySnapshot = (state) => ({
-  id: createId(),
-  archivedAt: new Date().toISOString(),
-  tournamentName: state.tournament.name,
-  status: state.tournament.status,
-  tournamentDate: state.tournament.date || '',
-  tournamentMode: state.tournament.mode || '',
-  tournamentPlace: state.tournament.place || '',
-  winnerId: state.tournament.winnerId || null,
-  winnerName: state.pairs.find((pair) => pair.id === state.tournament.winnerId)?.name || null,
-  players: state.players,
-  pairs: state.pairs,
-  groups: state.groups,
-  matches: state.matches,
-  standings: buildStandings(state.pairs, state.matches),
-  bracket: buildKnockoutBracket(buildStandings(state.pairs, state.matches), state.pairs, 8),
-  bracketResults: state.bracketResults || [],
-  bracketChampion: state.bracketChampion || null,
-});
-
-const samplePairs = [
-  ['Martina / Sofía', 'Martina López', 'Sofía Romero'],
-  ['Lola / Camila', 'Lola Pérez', 'Camila Gil'],
-  ['Juli / Mery', 'Juli Gutiérrez', 'Mery Arma'],
-  ['Mica / Eli', 'Mica Ernaga', 'Eli Colombo'],
-  ['Barby / Ambar', 'Barby Ríos', 'Ambar Moreno'],
-  ['Juli / Lore', 'Juli Díaz', 'Lore Martínez'],
-  ['Tere / Emi', 'Tere Aramburu', 'Emi Galante'],
-  ['Jose / Betu', 'Jose Caielli', 'Betu'],
-  ['Flor / Anto', 'Flor López', 'Anto Soqueira'],
-  ['Lu / Marti', 'Lu Sayah', 'Marti Roselló'],
-  ['Dani / Maga', 'Dani Fernández', 'Maga Palomeque'],
-  ['Sil / Agus', 'Sil Pestana', 'Agus Fama'],
-  ['Tati / Aldi', 'Tati Yarussi', 'Aldi Lerda'],
-];
-
-const renderRules = () => {
-  rulesList.innerHTML = rules.map((rule) => `<li>${rule}</li>`).join('');
-};
-
-const renderTournamentInfo = () => {
-  const state = getState();
-  const tournament = state.tournament;
-
-  if (!tournament.createdAt) {
-    tournamentInfoTitle.textContent = 'Sin torneo activo';
-    tournamentInfoMeta.textContent = 'Creá un torneo desde el panel de admin.';
-    return;
-  }
-
-  const parts = [
-    tournament.date ? new Date(`${tournament.date}T00:00:00`).toLocaleDateString('es-AR') : 'Sin fecha',
-    formatTournamentMode(tournament.mode),
-    tournament.place || 'Sin lugar',
-  ];
-
-  tournamentInfoTitle.textContent = tournament.name || 'Torneo actual';
-  tournamentInfoMeta.textContent = `${parts.join(' · ')} · ${tournament.status}`;
-};
-
-const renderPlayerOptions = () => {
-  const state = getState();
-  const players = state.players || [];
-  const editingPair = state.pairs.find((pair) => pair.id === pairId.value.trim());
-  const options =
-    '<option value="">Seleccionar jugador</option>' +
-    players
-      .map((player) => `<option value="${escapeHtml(player.id)}">${escapeHtml(getPlayerDisplayName(player))}</option>`)
-      .join('');
-
-  if (playerOneSelect) {
-    playerOneSelect.innerHTML = options;
-  }
-
-  if (playerTwoSelect) {
-    playerTwoSelect.innerHTML = options;
-  }
-
-  if (editingPair) {
-    playerOneSelect.value = editingPair.playerOneId || '';
-    playerTwoSelect.value = editingPair.playerTwoId || '';
-  }
-};
-
-const renderPlayers = () => {
-  const state = getState();
-  const players = [...(state.players || [])].sort((left, right) => left.fullName.localeCompare(right.fullName, 'es'));
-
-  if (players.length === 0) {
-    playersList.innerHTML = '<div class="placeholder">Todavia no hay jugadores registrados.</div>';
-    return;
-  }
-
-  playersList.innerHTML = players
-    .map(
-      (player) => `
-        <article class="pair-item">
-          <div>
-            <strong>${escapeHtml(getPlayerDisplayName(player))}</strong>
-            <div class="pair-meta">${escapeHtml([player.firstName, player.lastName].filter(Boolean).join(' '))}</div>
-          </div>
-          <div class="pair-actions">
-            <button type="button" class="mini-action" data-player-action="edit" data-player-id="${escapeHtml(player.id)}">Editar</button>
-            <button type="button" class="mini-action is-danger" data-player-action="delete" data-player-id="${escapeHtml(player.id)}">Borrar</button>
-          </div>
-        </article>
-      `,
-    )
-    .join('');
-};
-
-const renderPairs = () => {
-  const state = getState();
-  const pairs = state.pairs;
-  const players = state.players || [];
-  const locked = isTournamentFinalized();
-  const unlocked = isAdminUnlocked() && isAdminTabActive();
-  pairsCount.textContent = String(pairs.length);
-  tournamentStatus.textContent = state.tournament.status;
-
-  if (pairs.length === 0) {
-    pairsList.innerHTML = '<div class="placeholder">Todavia no hay parejas cargadas.</div>';
-    return;
-  }
-
-  pairsList.innerHTML = pairs
-    .map(
-      (pair, index) => `
-        <article class="pair-item">
-          <div>
-            <strong>${escapeHtml(pair.name)}</strong>
-            <div class="pair-meta">${escapeHtml(getPlayerDisplayName(players.find((player) => player.id === pair.playerOneId)))} / ${escapeHtml(getPlayerDisplayName(players.find((player) => player.id === pair.playerTwoId)))}</div>
-          </div>
-          ${unlocked ? `
-            <div class="pair-actions">
-              <button type="button" class="mini-action" data-action="edit" data-id="${escapeHtml(pair.id)}" ${locked ? 'disabled' : ''}>Editar</button>
-              <button type="button" class="mini-action is-danger" data-action="delete" data-id="${escapeHtml(pair.id)}" ${locked ? 'disabled' : ''}>Borrar</button>
-            </div>
-          ` : ''}
-        </article>
-      `,
-    )
-    .join('');
-};
-
-const renderWinnerSelect = () => {
-  const state = getState();
-  const pairs = state.pairs;
-  const locked = isTournamentFinalized();
-  const players = state.players || [];
-  const options = pairs
-    .map((pair) => {
-      const label = `${escapeHtml(pair.name)} (${escapeHtml(getPlayerName(players, pair.playerOneId, pair.playerOne))} / ${escapeHtml(getPlayerName(players, pair.playerTwoId, pair.playerTwo))})`;
-      return `<option value="${escapeHtml(pair.id)}" ${state.tournament.winnerId === pair.id ? 'selected' : ''}>${label}</option>`;
-    })
-    .join('');
-
-  if (pairs.length === 0) {
-    tournamentWinner.innerHTML = '<option value="">Sin parejas</option>';
-    tournamentWinner.disabled = true;
-    return;
-  }
-
-  tournamentWinner.disabled = locked;
-  tournamentWinner.innerHTML = '<option value="">Seleccionar ganador</option>' + options;
-};
-
-const renderGroups = () => {
-  const state = getState();
-  const pairMap = getPairMap(state.pairs);
-  const players = state.players || [];
-  const groupStats = new Map();
-
-  state.matches.forEach((match) => {
-    if (!match.played) {
-      return;
-    }
-
-    const winnerId = match.winnerId || null;
-    const participants = [match.pairAId, match.pairBId];
-
-    participants.forEach((pairIdValue) => {
-      const current = groupStats.get(pairIdValue) || {
-        wins: 0,
-        losses: 0,
-        setsFor: 0,
-        setsAgainst: 0,
-        gamesFor: 0,
-        gamesAgainst: 0,
-      };
-
-      const isWinner = winnerId === pairIdValue;
-      const isLoser = winnerId && winnerId !== pairIdValue;
-
-      current.wins += isWinner ? 1 : 0;
-      current.losses += isLoser ? 1 : 0;
-      current.setsFor += pairIdValue === match.pairAId ? (match.setsA ?? 0) : (match.setsB ?? 0);
-      current.setsAgainst += pairIdValue === match.pairAId ? (match.setsB ?? 0) : (match.setsA ?? 0);
-      current.gamesFor += pairIdValue === match.pairAId ? (match.gamesA ?? 0) : (match.gamesB ?? 0);
-      current.gamesAgainst += pairIdValue === match.pairAId ? (match.gamesB ?? 0) : (match.gamesA ?? 0);
-
-      groupStats.set(pairIdValue, current);
-    });
-  });
-
-  if (state.groups.length === 0) {
-    groupsList.innerHTML = '<div class="placeholder">Todavia no se generaron grupos.</div>';
-    return;
-  }
-
-  groupsList.innerHTML = state.groups
-    .map((group) => {
-      const rows = group.pairIds
-        .map((pairIdValue) => {
-          const pair = pairMap.get(pairIdValue);
-          const row = groupStats.get(pairIdValue) || {};
-
-          return {
-            id: pairIdValue,
-            name: pair?.name || pairIdValue,
-            wins: row.wins || 0,
-            losses: row.losses || 0,
-            setsDiff: (row.setsFor || 0) - (row.setsAgainst || 0),
-            gamesDiff: (row.gamesFor || 0) - (row.gamesAgainst || 0),
-          };
-        })
-        .sort((left, right) => right.wins - left.wins || right.setsDiff - left.setsDiff || right.gamesDiff - left.gamesDiff || left.name.localeCompare(right.name, 'es'));
-
-      return `
-        <article class="group-block">
-          <div class="group-title">${escapeHtml(group.name)}</div>
-          <div class="group-meta">${rows.length} parejas</div>
-          <div class="group-table-wrap">
-            <table class="group-table">
-              <colgroup>
-                <col class="group-table-name" />
-                <col class="group-table-stat" />
-                <col class="group-table-stat" />
-                <col class="group-table-stat" />
-                <col class="group-table-stat" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>Pareja</th>
-                  <th>G</th>
-                  <th>P</th>
-                  <th>DS</th>
-                  <th>DG</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${rows
-                  .map(
-                    (row) => `
-                      <tr>
-                        <td>${escapeHtml(row.name)}</td>
-                        <td>${row.wins}</td>
-                        <td>${row.losses}</td>
-                        <td>${row.setsDiff}</td>
-                        <td>${row.gamesDiff}</td>
-                      </tr>
-                    `,
-                  )
-                  .join('')}
-              </tbody>
-            </table>
-          </div>
-        </article>
-      `;
-    })
-    .join('');
-};
-
-const renderMatches = () => {
-  const state = getState();
-  const statusFilter = fixtureStatusFilter?.value || 'all';
-  const playerFilter = normalizeText(fixturePlayerFilter?.value || '').toLowerCase();
-  const players = state.players || [];
-
-  if (state.matches.length === 0) {
-    matchesList.innerHTML = '<div class="placeholder">Todavia no hay partidos generados.</div>';
-    return;
-  }
-
-  const filteredMatches = state.matches.filter((match) => {
-    const matchesStatus =
-      statusFilter === 'all' ||
-      (statusFilter === 'past' && match.played) ||
-      (statusFilter === 'future' && !match.played);
-
-    if (!matchesStatus) {
-      return false;
-    }
-
-    if (!playerFilter) {
-      return true;
-    }
-
-    const pairA = players.find((player) => player.id === match.pairAId);
-    const pairB = players.find((player) => player.id === match.pairBId);
-    const searchBlob = [
-      match.pairALabel,
-      match.pairBLabel,
-      pairA?.firstName,
-      pairA?.lastName,
-      pairA?.nickname,
-      pairA?.fullName,
-      pairB?.firstName,
-      pairB?.lastName,
-      pairB?.nickname,
-      pairB?.fullName,
-    ]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase();
-
-    return searchBlob.includes(playerFilter);
-  });
-
-  if (filteredMatches.length === 0) {
-    matchesList.innerHTML = '<div class="placeholder">No hay partidos para ese filtro.</div>';
-    return;
-  }
-
-  const matchesByDay = filteredMatches.reduce((accumulator, match) => {
-    const dayKey = match.date || 'Sin fecha';
-    if (!accumulator.has(dayKey)) {
-      accumulator.set(dayKey, []);
-    }
-    accumulator.get(dayKey).push(match);
-    return accumulator;
-  }, new Map());
-
-  const orderedDays = [...matchesByDay.keys()].sort((left, right) => {
-    if (left === 'Sin fecha') return 1;
-    if (right === 'Sin fecha') return -1;
-    return left.localeCompare(right);
-  });
-
-  matchesList.innerHTML = orderedDays
-    .map((dayKey) => {
-      const dayMatches = matchesByDay
-        .get(dayKey)
-        .slice()
-        .sort((left, right) => (left.time || '').localeCompare(right.time || '') || left.pairALabel.localeCompare(right.pairALabel, 'es'));
-
-      const title =
-        dayKey === 'Sin fecha'
-          ? 'Sin fecha asignada'
-          : new Date(`${dayKey}T00:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
-
-      return `
-        <article class="match-day">
-          <div class="match-day-head">${title}</div>
-          <div class="stack-list">
-            ${dayMatches
-              .map(
-                (match, index) => `
-                  <article class="match-block">
-                    <div class="match-title">Partido ${index + 1}</div>
-                    <div class="match-meta">${escapeHtml(match.pairALabel)} vs ${escapeHtml(match.pairBLabel)}</div>
-                    <div class="match-meta">
-                      Estado: ${match.played ? 'Jugado' : 'Pendiente'}
-                      ${match.played ? ` · Score ${match.setsA}-${match.setsB} / ${match.gamesA}-${match.gamesB}` : ''}
-                    </div>
-                    <div class="match-meta">
-                      ${match.time || match.venue ? `${escapeHtml(match.time || 'Sin hora')} · ${escapeHtml(match.venue || 'Sin lugar')}` : 'Sin agenda asignada'}
-                    </div>
-                    ${canEditTournament() ? `
-                      <form class="match-agenda-form" data-agenda-match-id="${match.id}">
-                        <label>
-                          Día
-                          <input name="date" type="date" value="${escapeHtml(match.date || '')}" />
-                        </label>
-                        <label>
-                          Hora
-                          <input name="time" type="time" value="${escapeHtml(match.time || '')}" />
-                        </label>
-                        <label>
-                          Lugar
-                          <input name="venue" type="text" value="${escapeHtml(match.venue || '')}" placeholder="Sede o cancha" />
-                        </label>
-                        <button type="submit" class="secondary">Guardar agenda</button>
-                      </form>
-                    ` : ''}
-                  </article>
-                `,
-              )
-              .join('')}
-          </div>
-        </article>
-      `;
-    })
-    .join('');
-};
-
-const renderStandings = () => {
-  const state = getState();
-  const standings = state.standings.length ? state.standings : buildStandings(state.pairs, state.matches);
-
-  if (standings.length === 0) {
-    standingsList.innerHTML = '<div class="placeholder">Todavia no hay tabla para mostrar.</div>';
-    return;
-  }
-
-  standingsList.innerHTML = `
-    <div class="group-table-wrap">
-      <table class="group-table standings-table">
-        <colgroup>
-          <col class="group-table-name" />
-          <col class="group-table-stat" />
-          <col class="group-table-stat" />
-          <col class="group-table-stat" />
-          <col class="group-table-stat" />
-          <col class="group-table-stat" />
-          <col class="group-table-stat" />
-        </colgroup>
-        <thead>
-          <tr>
-            <th>Pareja</th>
-            <th>PJ</th>
-            <th class="standings-points-head">PTS</th>
-            <th>SETS</th>
-            <th>GAMES</th>
-            <th>DS</th>
-            <th>DG</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${standings
-            .map(
-              (row, index) => `
-                <tr class="${index < 8 ? 'standings-qualified' : ''}">
-                  <td>${index + 1}. ${escapeHtml(row.name)}</td>
-                  <td>${row.matchesPlayed}</td>
-                  <td class="standings-points-cell">${row.points}</td>
-                  <td>${row.setsFor}-${row.setsAgainst}</td>
-                  <td>${row.gamesFor}-${row.gamesAgainst}</td>
-                  <td>${row.setsFor - row.setsAgainst}</td>
-                  <td>${row.gamesFor - row.gamesAgainst}</td>
-                </tr>
-              `,
-            )
-            .join('')}
-        </tbody>
-      </table>
-    </div>
-  `;
-};
-
-const renderPodium = () => {
-  const state = getState();
-
-  const finished = isTournamentFinalized();
-  podiumSection.hidden = !finished;
-  podiumSection.toggleAttribute('hidden', !finished);
-  podiumSection.classList.toggle('is-hidden', !finished);
-
-  if (!finished) {
-    podiumList.innerHTML = '';
-    return;
-  }
-
-  const standings = state.standings.length ? state.standings : buildStandings(state.pairs, state.matches);
-  const podium = standings.slice(0, 3);
-
-  if (podium.length === 0) {
-    podiumList.innerHTML = '<div class="placeholder">Todavia no hay podio para mostrar.</div>';
-    return;
-  }
-
-  const podiumMeta = [
-    { label: '1°', className: 'gold' },
-    { label: '2°', className: 'silver' },
-    { label: '3°', className: 'bronze' },
-  ];
-
-  podiumList.innerHTML = podium
-    .map(
-      (row, index) => `
-        <article class="podium-item ${podiumMeta[index].className}">
-          <div class="podium-rank">${podiumMeta[index].label}</div>
-          <div class="podium-name">${escapeHtml(row.name)}</div>
-          <div class="podium-meta">
-            Pts: ${row.points} · PJ: ${row.matchesPlayed} · Prom: ${(row.points / Math.max(row.matchesPlayed, 1)).toFixed(2)}
-          </div>
-        </article>
-      `,
-    )
-    .join('');
-};
-
-const renderBracket = () => {
-  const state = getState();
-  const bracket = state.bracket.length ? state.bracket : buildKnockoutBracket(buildStandings(state.pairs, state.matches), state.pairs, 8);
-  const resolvedBracket = resolveBracketWinner(bracket, state.bracketResults || [], state.pairs);
-
-  if (bracket.length === 0) {
-    bracketList.innerHTML = '<div class="placeholder">Todavia no hay cuadro generado.</div>';
-    return;
-  }
-
-  const championId = getFinalWinnerId(state);
-  const champion = isTournamentFinalized() && championId
-    ? state.pairs.find((pair) => pair.id === championId)?.name || 'Ganador'
-    : resolvedBracket.champion?.winnerName || 'Pendiente';
-
-  bracketList.innerHTML = resolvedBracket.played
-    .map(
-      (round, index) => `
-        <article class="bracket-round">
-          <div class="bracket-header">
-            <div class="bracket-title">${escapeHtml(round.name)}</div>
-            <div class="bracket-step">Fase ${index + 1}</div>
-          </div>
-          <div class="bracket-track">
-            ${round.matches
-              .map(
-                (match, matchIndex) => `
-                  <div class="bracket-match ${matchIndex === 0 ? 'bracket-match--lead' : ''}">
-                    <div class="bracket-match-top">
-                      <span class="bracket-seed">${index + 1}.${matchIndex + 1}</span>
-                      <span class="bracket-state">${match.ready ? (match.played ? 'Jugado' : 'Listo') : 'Pendiente'}</span>
-                    </div>
-                    <div class="bracket-teams">
-                      <strong>${escapeHtml(match.pairALabel)}</strong>
-                      <span>vs</span>
-                      <strong>${escapeHtml(match.pairBLabel)}</strong>
-                    </div>
-                    <div class="bracket-meta">
-                      ${match.played ? `Ganador: ${escapeHtml(state.pairs.find((pair) => pair.id === match.winnerId)?.name || 'Pendiente')}` : 'Ganador avanza a la siguiente fase'}
-                    </div>
-                  </div>
-                `,
-              )
-              .join('')}
-          </div>
-        </article>
-      `,
-    )
-    .join('') +
-    `
-      <article class="bracket-champion">
-        <div class="bracket-champion-label">Campeón</div>
-        <div class="bracket-champion-name">${escapeHtml(champion)}</div>
-        <div class="bracket-champion-meta">
-          ${isTournamentFinalized() ? 'Torneo cerrado y archivado' : 'Pendiente de declaración'}
-        </div>
-      </article>
-    `;
-};
-
-const renderBracketResults = () => {
-  const state = getState();
-  const locked = isTournamentFinalized();
-  const bracket = state.bracket.length ? state.bracket : buildKnockoutBracket(buildStandings(state.pairs, state.matches), state.pairs, 8);
-  const resolvedBracket = resolveBracketWinner(bracket, state.bracketResults || [], state.pairs);
-  const flatBracket = flattenBracket(resolvedBracket.played);
-
-  if (flatBracket.length === 0) {
-    bracketResultsList.innerHTML = '<div class="placeholder">Todavia no hay resultados del cuadro.</div>';
-    return;
-  }
-
-  bracketResultsList.innerHTML = flatBracket
-    .map(
-      (match) => `
-        <article class="bracket-result">
-          <div class="bracket-result-head">
-            <div class="bracket-result-round">${match.roundName}</div>
-            <div class="bracket-state">${match.played ? 'Jugado' : 'Pendiente'}</div>
-          </div>
-          <div class="bracket-result-team">
-            <strong>${escapeHtml(match.pairALabel)}</strong>
-            <strong>${escapeHtml(match.pairBLabel)}</strong>
-          </div>
-          <label>
-            Ganador
-            <select data-bracket-match-id="${match.id}" ${match.ready && !locked ? '' : 'disabled'}>
-              <option value="">Seleccionar</option>
-              <option value="${escapeHtml(match.pairAId)}" ${(state.bracketResults || []).find((result) => result.matchId === match.id)?.winnerId === match.pairAId ? 'selected' : ''}>${escapeHtml(match.pairALabel)}</option>
-              <option value="${escapeHtml(match.pairBId)}" ${(state.bracketResults || []).find((result) => result.matchId === match.id)?.winnerId === match.pairBId ? 'selected' : ''}>${escapeHtml(match.pairBLabel)}</option>
-            </select>
-          </label>
-        </article>
-      `,
-    )
-    .join('');
-};
-
-const renderResults = () => {
-  const state = getState();
-  const locked = isTournamentFinalized();
-
-  if (state.matches.length === 0) {
-    resultsList.innerHTML = '<div class="placeholder">Todavia no hay partidos generados.</div>';
-    return;
-  }
-
-  resultsList.innerHTML = state.matches
-    .map(
-      (match, index) => `
-        <article class="result-block">
-          <div class="match-title">Partido ${index + 1}</div>
-          <div class="match-meta">${escapeHtml(match.pairALabel)} vs ${escapeHtml(match.pairBLabel)}</div>
-          <form class="result-form" data-match-id="${match.id}">
-            <div class="result-grid">
-              <label>
-                Ganador
-                <select name="winnerId" ${locked ? 'disabled' : ''}>
-                  <option value="">Definir por score</option>
-                  <option value="${escapeHtml(match.pairAId)}" ${match.winnerId === match.pairAId ? 'selected' : ''}>${escapeHtml(match.pairALabel)}</option>
-                  <option value="${escapeHtml(match.pairBId)}" ${match.winnerId === match.pairBId ? 'selected' : ''}>${escapeHtml(match.pairBLabel)}</option>
-                </select>
-              </label>
-              <label>
-                Sets ${escapeHtml(match.pairALabel)}
-                <input name="setsA" type="number" min="0" value="${match.setsA ?? ''}" ${locked ? 'disabled' : ''} />
-              </label>
-              <label>
-                Sets ${escapeHtml(match.pairBLabel)}
-                <input name="setsB" type="number" min="0" value="${match.setsB ?? ''}" ${locked ? 'disabled' : ''} />
-              </label>
-              <label>
-                Games ${escapeHtml(match.pairALabel)}
-                <input name="gamesA" type="number" min="0" value="${match.gamesA ?? ''}" ${locked ? 'disabled' : ''} />
-              </label>
-              <label>
-                Games ${escapeHtml(match.pairBLabel)}
-                <input name="gamesB" type="number" min="0" value="${match.gamesB ?? ''}" ${locked ? 'disabled' : ''} />
-              </label>
-              <label>
-                Día
-                <input name="date" type="date" value="${escapeHtml(match.date || '')}" ${locked ? 'disabled' : ''} />
-              </label>
-              <label>
-                Hora
-                <input name="time" type="time" value="${escapeHtml(match.time || '')}" ${locked ? 'disabled' : ''} />
-              </label>
-              <label>
-                Lugar
-                <input name="venue" type="text" value="${escapeHtml(match.venue || '')}" placeholder="Sede o cancha" ${locked ? 'disabled' : ''} />
-              </label>
-            </div>
-            <div class="result-actions">
-              <button type="button" class="secondary" data-action="noshow-a" data-match-id="${match.id}" ${locked ? 'disabled' : ''}>No show A</button>
-              <button type="button" class="secondary" data-action="noshow-b" data-match-id="${match.id}" ${locked ? 'disabled' : ''}>No show B</button>
-              <button type="submit" class="primary" ${locked ? 'disabled' : ''}>Guardar</button>
-            </div>
-          </form>
-        </article>
-      `,
-    )
-    .join('');
-};
-
-const renderHistory = () => {
-  renderHistoryDashboard();
-};
-
-const renderAll = () => {
-  renderRules();
-  renderTournamentInfo();
-  renderPlayerOptions();
-  renderPlayers();
-  renderPairs();
-  renderWinnerSelect();
-  renderGroups();
-  renderMatches();
-  renderStandings();
-  renderPodium();
-  renderBracket();
-  renderBracketResults();
-  renderResults();
-  renderHistoryDashboard();
-  renderAdminState();
-  syncTournamentCreationState();
-};
-
-const renderAdminState = () => {
-  const unlocked = isAdminUnlocked();
-  const locked = isTournamentFinalized();
-  const hasTournament = hasActiveTournament(getState());
-  adminLock.hidden = unlocked;
-  adminLock.classList.toggle('is-hidden', unlocked);
-  adminContent.hidden = !unlocked;
-  adminContent.classList.toggle('is-hidden', !unlocked);
-  if (adminLoginForm) {
-    adminLoginForm.hidden = unlocked;
-  }
-
-  [
-    pairId,
-    pairName,
-    clearPairs,
-    planTournament,
-    loadSamplePairs,
-    tournamentWinner,
-  ].forEach((control) => {
-    if (!control) {
-      return;
-    }
-
-    control.disabled = !unlocked || (locked && control !== adminLogout);
-  });
-
-  pairForm.querySelectorAll('input, button').forEach((control) => {
-    control.disabled = !unlocked || locked;
-  });
-
-  if (adminLogout) {
-    adminLogout.disabled = !unlocked;
-  }
-
-  if (archiveTournament) {
-    archiveTournament.disabled = !unlocked || !canArchiveTournament();
-  }
-
-  if (pairForm) {
-    pairForm.querySelectorAll('input, select, button').forEach((control) => {
-      control.disabled = !unlocked || locked || !hasTournament;
-    });
-  }
-
-  if (playerForm) {
-    playerForm.querySelectorAll('input, select, button').forEach((control) => {
-      control.disabled = !unlocked;
-    });
-  }
-
-  if (tournamentForm) {
-    tournamentForm.querySelectorAll('input, select, button').forEach((control) => {
-      control.disabled = !unlocked || hasTournament;
-    });
-  }
-
-  if (deleteCurrentTournament) {
-    deleteCurrentTournament.disabled = !unlocked || locked || !hasTournament;
-  }
+  selectedCategoryId = categoryId;
+  appState = normalizeLoadedState(appState);
+  renderAll();
 };
 
 const setActiveTab = (tabName) => {
+  activeTab = tabName;
   tabButtons.forEach((button) => {
     button.classList.toggle('is-active', button.dataset.tab === tabName);
   });
@@ -1220,1485 +263,1365 @@ const setActiveTab = (tabName) => {
   });
 };
 
-const resetForm = () => {
-  pairForm.reset();
-  pairId.value = '';
-  planTournament.textContent = 'Planificar automáticamente';
-};
+const renderTabs = () => {
+  tabButtons.forEach((button) => {
+    button.classList.toggle('is-active', button.dataset.tab === activeTab);
+  });
 
-const resetPlayerForm = () => {
-  playerForm.reset();
-  playerId.value = '';
-};
-
-const startEditPair = (id) => {
-  const state = getState();
-  const pair = state.pairs.find((entry) => entry.id === id);
-  if (!pair) {
-    return;
-  }
-
-  pairId.value = pair.id;
-  pairName.value = pair.name;
-  playerOneSelect.value = pair.playerOneId || '';
-  playerTwoSelect.value = pair.playerTwoId || '';
-  planTournament.textContent = 'Planificar automáticamente';
-  setActiveTab('admin');
-};
-
-const startEditPlayer = (id) => {
-  const state = getState();
-  const player = state.players.find((entry) => entry.id === id);
-  if (!player) {
-    return;
-  }
-
-  playerId.value = player.id;
-  playerFirstName.value = player.firstName || '';
-  playerLastName.value = player.lastName || '';
-  playerAlias.value = player.nickname || '';
-  setActiveTab('admin');
-};
-
-const handleApiError = async (error, fallbackMessage = 'No se pudo completar la acción.') => {
-  if (error?.status === 401) {
-    await lockAdmin();
-    if (adminLock) {
-      adminLock.hidden = false;
-      adminLock.classList.remove('is-hidden');
-    }
-    if (adminContent) {
-      adminContent.hidden = true;
-      adminContent.classList.add('is-hidden');
-    }
-    setAppError('La sesión de administrador expiró.');
-    renderAll();
-    setActiveTab('admin');
-    return;
-  }
-
-  setAppError(error?.message || fallbackMessage);
-};
-
-const deletePair = async (id) => {
-  try {
-    await deletePairApi(id);
-    await refreshState();
-  } catch (error) {
-    await handleApiError(error, 'No se pudo borrar la pareja.');
-  }
-};
-
-const deletePlayer = async (id) => {
-  const state = getState();
-  const usedInPairs = state.pairs.some((pair) => pair.playerOneId === id || pair.playerTwoId === id);
-
-  if (usedInPairs) {
-    setAppError('No se puede borrar un jugador que ya está usado en una pareja.');
-    return;
-  }
-
-  try {
-    await deletePlayerApi(id);
-    await refreshState();
-  } catch (error) {
-    await handleApiError(error, 'No se pudo borrar el jugador.');
-  }
-};
-
-const createNewTournament = async ({ date, mode, place }) => {
-  const state = getState();
-
-  if (hasActiveTournament(state)) {
-    setAppError('Primero completá o eliminá el torneo actual.');
-    return;
-  }
-
-  try {
-    await createTournamentApi({
-      date,
-      mode,
-      place,
-    });
-    await refreshState();
-  } catch (error) {
-    await handleApiError(error, 'No se pudo crear el torneo.');
-  }
-};
-
-const deleteCurrentTournamentState = async () => {
-  const state = getState();
-  const tournamentId = state?.tournament?.id;
-
-  if (!tournamentId) {
-    return;
-  }
-
-  try {
-    await deleteTournamentApi(tournamentId);
-    appState = defaultState();
-    await refreshState();
-  } catch (error) {
-    await handleApiError(error, 'No se pudo eliminar el torneo actual.');
-  }
-};
-
-const updateMatch = async (matchId, updater) => {
-  if (!canEditTournament()) {
-    return;
-  }
-
-  const state = getState();
-  const match = state.matches.find((entry) => entry.id === matchId);
-  if (!match) {
-    setAppError('No se encontró el partido.');
-    return;
-  }
-
-  const nextMatch = updater(match);
-
-  try {
-    await updateMatchApi(matchId, nextMatch);
-    await refreshState();
-  } catch (error) {
-    await handleApiError(error, 'No se pudo actualizar el partido.');
-  }
-};
-
-const updateMatchAgenda = async (matchId, agenda) => {
-  await updateMatch(matchId, (match) => ({
-    ...match,
-    date: agenda.date,
-    time: agenda.time,
-    venue: agenda.venue,
-  }));
-};
-
-const parseNumber = (value) => {
-  if (value === '' || value === null || value === undefined) {
-    return null;
-  }
-
-  const parsedValue = Number.parseInt(value, 10);
-  return Number.isNaN(parsedValue) ? null : parsedValue;
-};
-
-const applyNoShow = async (matchId, winnerSide) => {
-  if (!canEditTournament()) {
-    return;
-  }
-
-  await updateMatch(matchId, (match) => {
-    const winnerId = winnerSide === 'A' ? match.pairAId : match.pairBId;
-    const loserId = winnerSide === 'A' ? match.pairBId : match.pairAId;
-
-    return {
-      ...match,
-      played: true,
-      winnerId,
-      loserId,
-      setsA: winnerSide === 'A' ? 2 : 0,
-      setsB: winnerSide === 'A' ? 0 : 2,
-      gamesA: winnerSide === 'A' ? 12 : 0,
-      gamesB: winnerSide === 'A' ? 0 : 12,
-    };
+  panels.forEach((panel) => {
+    panel.classList.toggle('is-active', panel.id === `tab-${activeTab}`);
   });
 };
 
-tabButtons.forEach((button) => {
-  button.addEventListener('click', () => setActiveTab(button.dataset.tab));
-});
+const renderEventHeader = () => {
+  const event = appState.event || defaultState().event;
+  const categoryCount = appState.categories.length;
+  const activeCategory = getSelectedCategory();
 
-pairForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
+  const eventTitle = event.name || 'padelApp';
+  const subtitle = categoryCount
+    ? `${categoryCount} categoría${categoryCount === 1 ? '' : 's'} · ${event.mode || 'sin modo'} · ${event.place || 'sin sede'}`
+    : 'Sin evento activo';
 
-  if (!canEditTournament()) {
-    setAppError('Acceso denegado.');
-    return;
+  [eventNameDesktop, eventNameMobile].forEach((node) => {
+    if (node) {
+      node.textContent = eventTitle;
+    }
+  });
+
+  [eventSubtitleDesktop, eventSubtitleMobile].forEach((node) => {
+    if (node) {
+      node.textContent = categoryCount
+        ? 'Vista pública + panel admin'
+        : 'Creá un evento desde el panel de admin.';
+    }
+  });
+
+  if (eventStatus) {
+    eventStatus.textContent = event.status || 'Sin evento activo';
   }
 
-  const state = getState();
-  if (!hasActiveTournament(state)) {
-    setAppError('Creá un torneo antes de agregar parejas.');
-    return;
+  if (eventMeta) {
+    eventMeta.textContent = categoryCount
+      ? `${formatDateLabel(event.date)} · ${event.place || 'Sin sede'}`
+      : 'Creá un evento desde el panel de admin.';
   }
 
-  const name = normalizeText(pairName.value);
-  const firstPlayerId = playerOneSelect.value.trim();
-  const secondPlayerId = playerTwoSelect.value.trim();
-  const editingId = pairId.value.trim();
-
-  if (!name || !firstPlayerId || !secondPlayerId) {
-    setAppError('Completa nombre de pareja y seleccioná dos jugadores.');
-    return;
+  if (fixtureCategoryTitle) {
+    fixtureCategoryTitle.textContent = activeCategory ? activeCategory.name : 'Sin categoría seleccionada';
   }
 
-  if (firstPlayerId === secondPlayerId) {
-    setAppError('Una pareja no puede usar el mismo jugador dos veces.');
-    return;
+  if (fixtureCategoryMeta) {
+    fixtureCategoryMeta.textContent = activeCategory
+      ? `${activeCategory.status} · ${activeCategory.pairs.length} parejas`
+      : 'Elegí una categoría para ver su fixture.';
   }
 
-  const players = state.players || [];
-  const firstPlayer = getPlayerName(players, firstPlayerId);
-  const secondPlayer = getPlayerName(players, secondPlayerId);
-
-  if (!firstPlayer || !secondPlayer) {
-    setAppError('Seleccioná jugadores válidos.');
-    return;
+  if (tableCategoryTitle) {
+    tableCategoryTitle.textContent = activeCategory ? activeCategory.name : 'Sin categoría seleccionada';
   }
 
-  const payload = {
-    name,
-    playerOneId: firstPlayerId,
-    playerTwoId: secondPlayerId,
-  };
+  if (tableCategoryMeta) {
+    tableCategoryMeta.textContent = activeCategory
+      ? `${activeCategory.status} · ${activeCategory.pairs.length} parejas`
+      : 'Elegí una categoría para ver la tabla.';
+  }
 
-  try {
-    setFormBusy(pairForm, true);
-    setAppError('');
-    if (editingId) {
-      await updatePairApi(editingId, payload);
+  if (currentEventSummary) {
+    if (!categoryCount) {
+      currentEventSummary.hidden = false;
+      currentEventSummary.innerHTML = `
+        <strong>${escapeHtml(eventTitle)}</strong>
+        <span class="meta">${escapeHtml(event.status || 'Sin evento activo')}</span>
+        <span class="meta">${escapeHtml(subtitle)}</span>
+      `;
     } else {
-      await createPairApi(payload);
-    }
-    await refreshState();
-    resetForm();
-    setActiveTab('parejas');
-  } catch (error) {
-    await handleApiError(error, editingId ? 'No se pudo actualizar la pareja.' : 'No se pudo crear la pareja.');
-  } finally {
-    setFormBusy(pairForm, false);
-  }
-});
-
-playerForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-
-  if (!isAdminUnlocked()) {
-    setAppError('Acceso denegado.');
-    return;
-  }
-
-  const state = getState();
-  const firstName = normalizeText(playerFirstName.value);
-  const lastName = normalizeText(playerLastName.value);
-  const alias = normalizeText(playerAlias.value || '');
-  const editingId = playerId.value.trim();
-
-  if (!firstName || !lastName) {
-    setAppError('Completá nombre y apellido.');
-    return;
-  }
-
-  const duplicatePlayer = state.players.find(
-    (player) =>
-      normalizeText(player.firstName).toLowerCase() === firstName.toLowerCase() &&
-      normalizeText(player.lastName).toLowerCase() === lastName.toLowerCase() &&
-      player.id !== editingId,
-  );
-
-  if (duplicatePlayer) {
-    setAppError('Ya existe un jugador con ese nombre.');
-    return;
-  }
-
-  const payload = {
-    firstName,
-    lastName,
-    nickname: alias,
-  };
-
-  try {
-    setFormBusy(playerForm, true);
-    setAppError('');
-    if (editingId) {
-      await updatePlayerApi(editingId, payload);
-    } else {
-      await createPlayerApi(payload);
-    }
-    await refreshState();
-    resetPlayerForm();
-  } catch (error) {
-    await handleApiError(error, editingId ? 'No se pudo actualizar el jugador.' : 'No se pudo crear el jugador.');
-  } finally {
-    setFormBusy(playerForm, false);
-  }
-});
-
-playersList.addEventListener('click', async (event) => {
-  if (!isAdminUnlocked()) {
-    return;
-  }
-
-  const button = event.target.closest('button[data-player-action]');
-  if (!button) {
-    return;
-  }
-
-  const { playerAction, playerId: targetPlayerId } = button.dataset;
-
-  if (playerAction === 'edit') {
-    startEditPlayer(targetPlayerId);
-  }
-
-  if (playerAction === 'delete') {
-    await deletePlayer(targetPlayerId);
-    if (playerId.value === targetPlayerId) {
-      resetPlayerForm();
+      currentEventSummary.hidden = false;
+      currentEventSummary.innerHTML = `
+        <strong>${escapeHtml(eventTitle)}</strong>
+        <span class="meta">${escapeHtml(subtitle)}</span>
+      `;
     }
   }
-});
-
-tournamentForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-
-  if (!isAdminUnlocked()) {
-    return;
-  }
-
-  try {
-    setFormBusy(tournamentForm, true);
-    setAppError('');
-    await createNewTournament({
-      date: tournamentDate.value,
-      mode: tournamentMode.value,
-      place: normalizeText(tournamentPlace.value),
-    });
-    setActiveTab('torneo');
-  } finally {
-    setFormBusy(tournamentForm, false);
-  }
-});
-
-deleteCurrentTournament.addEventListener('click', async () => {
-  if (!isAdminUnlocked()) {
-    return;
-  }
-
-  if (!hasActiveTournament(getState())) {
-    return;
-  }
-
-  await deleteCurrentTournamentState();
-  resetForm();
-  resetPlayerForm();
-});
-
-pairsList.addEventListener('click', async (event) => {
-  if (!canEditTournament()) {
-    if (isAdminUnlocked()) {
-      setAppError('El torneo está cerrado.');
-    }
-    return;
-  }
-
-  const state = getState();
-  if (!hasActiveTournament(state)) {
-    return;
-  }
-
-  const button = event.target.closest('button[data-action]');
-  if (!button) {
-    return;
-  }
-
-  const { action, id } = button.dataset;
-
-  if (action === 'edit') {
-    startEditPair(id);
-  }
-
-  if (action === 'delete') {
-    await deletePair(id);
-    if (pairId.value === id) {
-      resetForm();
-    }
-  }
-});
-
-resultsList.addEventListener('click', async (event) => {
-  if (!canEditTournament()) {
-    return;
-  }
-
-  const state = getState();
-  if (!hasActiveTournament(state)) {
-    return;
-  }
-
-  const button = event.target.closest('button[data-action]');
-  if (!button) {
-    return;
-  }
-
-  const { action, matchId } = button.dataset;
-
-  if (action === 'noshow-a') {
-    await withButtonBusy(button, () => applyNoShow(matchId, 'A'));
-  }
-
-  if (action === 'noshow-b') {
-    await withButtonBusy(button, () => applyNoShow(matchId, 'B'));
-  }
-});
-
-resultsList.addEventListener('submit', async (event) => {
-  if (!canEditTournament()) {
-    return;
-  }
-
-  const form = event.target.closest('form[data-match-id]');
-  if (!form || event.target !== form) {
-    return;
-  }
-
-  event.preventDefault();
-
-  const state = getState();
-  if (!hasActiveTournament(state)) {
-    return;
-  }
-
-  const matchId = form.dataset.matchId;
-  const formData = new FormData(form);
-  const match = state.matches.find((entry) => entry.id === matchId);
-  const winnerId = formData.get('winnerId');
-  const setsA = parseNumber(formData.get('setsA'));
-  const setsB = parseNumber(formData.get('setsB'));
-  const gamesA = parseNumber(formData.get('gamesA'));
-  const gamesB = parseNumber(formData.get('gamesB'));
-  const date = normalizeText(formData.get('date') || '');
-  const time = normalizeText(formData.get('time') || '');
-  const venue = normalizeText(formData.get('venue') || '');
-
-  if (setsA === null || setsB === null || gamesA === null || gamesB === null) {
-    setAppError('Completa sets y games para guardar el resultado.');
-    return;
-  }
-
-  if (!match) {
-    setAppError('No se encontró el partido.');
-    return;
-  }
-
-  const scoreWinnerId = getMatchWinnerFromScore(match, setsA, setsB, gamesA, gamesB);
-  let resolvedWinnerId = winnerId || null;
-
-  if (!resolvedWinnerId) {
-    resolvedWinnerId = scoreWinnerId;
-  }
-
-  if (!resolvedWinnerId) {
-    setAppError('El score no define ganador. Ajustá sets o games, o elegí el ganador manualmente.');
-    return;
-  }
-
-  if (winnerId && scoreWinnerId && winnerId !== scoreWinnerId) {
-    setAppError('El ganador seleccionado no coincide con el score.');
-    return;
-  }
-
-  if (winnerId && !scoreWinnerId && (setsA === setsB || gamesA === gamesB)) {
-    setAppError('El score está empatado o no es decisivo. No puede guardarse así.');
-    return;
-  }
-
-  try {
-    setFormBusy(form, true);
-    setAppError('');
-    await updateMatch(matchId, (currentMatch) => ({
-      ...currentMatch,
-      played: true,
-      winnerId: resolvedWinnerId,
-      loserId: resolvedWinnerId === currentMatch.pairAId ? currentMatch.pairBId : currentMatch.pairAId,
-      setsA,
-      setsB,
-      gamesA,
-      gamesB,
-      date,
-      time,
-      venue,
-    }));
-  } finally {
-    setFormBusy(form, false);
-  }
-});
-
-matchesList.addEventListener('submit', async (event) => {
-  if (!canEditTournament()) {
-    return;
-  }
-
-  const form = event.target.closest('form[data-agenda-match-id]');
-  if (!form || event.target !== form) {
-    return;
-  }
-
-  event.preventDefault();
-
-  const state = getState();
-  if (!hasActiveTournament(state)) {
-    return;
-  }
-
-  const matchId = form.dataset.agendaMatchId;
-  const formData = new FormData(form);
-
-  try {
-    setFormBusy(form, true);
-    setAppError('');
-    await updateMatchAgenda(matchId, {
-      date: normalizeText(formData.get('date') || ''),
-      time: normalizeText(formData.get('time') || ''),
-      venue: normalizeText(formData.get('venue') || ''),
-    });
-  } finally {
-    setFormBusy(form, false);
-  }
-});
-
-bracketResultsList.addEventListener('change', async (event) => {
-  if (!canEditTournament()) {
-    return;
-  }
-
-  const select = event.target.closest('select[data-bracket-match-id]');
-  if (!select) {
-    return;
-  }
-
-  const state = getState();
-  if (!hasActiveTournament(state)) {
-    return;
-  }
-
-  const matchId = select.dataset.bracketMatchId;
-  const winnerId = select.value.trim();
-
-  try {
-    select.disabled = true;
-    setAppError('');
-    await updateMatchApi(matchId, {
-      winnerId: winnerId || null,
-      played: Boolean(winnerId),
-      setsA: null,
-      setsB: null,
-      gamesA: null,
-      gamesB: null,
-      scoreA: null,
-      scoreB: null,
-    });
-    await refreshState();
-  } catch (error) {
-    await handleApiError(error, 'No se pudo actualizar el cuadro.');
-  } finally {
-    select.disabled = false;
-  }
-});
-
-clearPairs.addEventListener('click', async () => {
-  if (!isAdminUnlocked() || isTournamentFinalized()) {
-    return;
-  }
-
-  const state = getState();
-  if (!hasActiveTournament(state)) {
-    return;
-  }
-
-  try {
-    setAppError('');
-    const tournament = state.tournament;
-    await deleteTournamentApi(tournament.id);
-    await createTournamentApi({
-      name: tournament.name,
-      date: tournament.date,
-      mode: tournament.mode,
-      place: tournament.place,
-      scoring_win: tournament.scoring?.win ?? 1,
-      scoring_loss: tournament.scoring?.loss ?? 0,
-      scoring_no_show: tournament.scoring?.noShow ?? 0,
-      rules_version: tournament.rulesVersion ?? 1,
-    });
-    await refreshState();
-    resetForm();
-  } catch (error) {
-    await handleApiError(error, 'No se pudieron vaciar las parejas.');
-  }
-});
-
-loadSamplePairs.addEventListener('click', async () => {
-  if (!isAdminUnlocked() || isTournamentFinalized()) {
-    setAppError('Acceso denegado.');
-    return;
-  }
-
-  const state = getState();
-  if (!hasActiveTournament(state)) {
-    setAppError('Creá un torneo antes de cargar parejas.');
-    return;
-  }
-
-  try {
-    setAppError('');
-    const playerMap = new Map((state.players || []).map((player) => [normalizeText(player.fullName).toLowerCase(), player]));
-
-    const ensurePlayer = async (fullName) => {
-      const cleanName = normalizeText(fullName);
-      const key = cleanName.toLowerCase();
-      if (playerMap.has(key)) {
-        return playerMap.get(key);
-      }
-
-      const [firstName = cleanName, ...rest] = cleanName.split(' ');
-      const created = await createPlayerApi({
-        firstName,
-        lastName: rest.join(' ') || firstName,
-        nickname: '',
-      });
-      playerMap.set(key, created);
-      return created;
-    };
-
-    for (const [name, playerOneName, playerTwoName] of samplePairs) {
-      const firstPlayer = await ensurePlayer(playerOneName);
-      const secondPlayer = await ensurePlayer(playerTwoName);
-      await createPairApi({
-        name,
-        playerOneId: firstPlayer.id,
-        playerTwoId: secondPlayer.id,
-      });
-    }
-
-    await refreshState();
-    setActiveTab('parejas');
-  } catch (error) {
-    await handleApiError(error, 'No se pudieron cargar las parejas de prueba.');
-  }
-});
-
-planTournament.addEventListener('click', async () => {
-  if (!isAdminUnlocked() || isTournamentFinalized()) {
-    setAppError('Acceso denegado.');
-    return;
-  }
-
-  const state = getState();
-  if (!hasActiveTournament(state)) {
-    setAppError('Creá un torneo antes de planificar.');
-    return;
-  }
-
-  const pairTotal = state.pairs.length;
-
-  if (pairTotal < 2) {
-    setAppError('Necesitas al menos 2 parejas para planificar el torneo.');
-    return;
-  }
-
-  try {
-    setAppError('');
-    await planTournamentApi(state.tournament.id);
-    await refreshState();
-    setActiveTab('torneo');
-  } catch (error) {
-    await handleApiError(error, 'No se pudo planificar el torneo.');
-  }
-});
-
-archiveTournament.addEventListener('click', async () => {
-  if (!canEditTournament()) {
-    setAppError('Acceso denegado.');
-    return;
-  }
-
-  const state = getState();
-  const winnerId = getFinalWinnerId(state);
-
-  if (!winnerId) {
-    setAppError('Primero resolvé el cuadro completo para definir al campeón.');
-    return;
-  }
-
-  if (state.tournament.closedAt || state.tournament.status === 'Archivado') {
-    setAppError('El torneo ya está cerrado.');
-    return;
-  }
-
-  try {
-    setAppError('');
-    await archiveTournamentApi(state.tournament.id, winnerId);
-    await refreshState();
-    setActiveTab('historial');
-  } catch (error) {
-    await handleApiError(error, 'No se pudo archivar el torneo.');
-  }
-});
-
-fixtureStatusFilter.addEventListener('change', renderAll);
-fixturePlayerFilter.addEventListener('input', renderAll);
-tournamentWinner.addEventListener('change', async () => {
-  if (!canEditTournament()) {
-    return;
-  }
-
-  const state = getState();
-  try {
-    await updateTournamentApi(state.tournament.id, {
-      winnerId: tournamentWinner.value.trim() || null,
-      closedAt: null,
-    });
-    await refreshState();
-  } catch (error) {
-    await handleApiError(error, 'No se pudo actualizar el ganador del torneo.');
-  }
-});
-
-adminLogout.addEventListener('click', async () => {
-  await lockAdmin();
-  adminLock.hidden = false;
-  adminLock.classList.remove('is-hidden');
-  adminContent.hidden = true;
-  adminContent.classList.add('is-hidden');
-  renderAll();
-  setActiveTab('admin');
-});
-
-document.addEventListener('keydown', async (event) => {
-  if (event.key === 'Escape' && isAdminUnlocked()) {
-    await lockAdmin();
-    adminLock.hidden = false;
-    adminLock.classList.remove('is-hidden');
-    adminContent.hidden = true;
-    adminContent.classList.add('is-hidden');
-    renderAll();
-    syncTournamentCreationState();
-    syncAdminTwoColumnLayout();
-    syncAdminFormLabels();
-    setActiveTab('admin');
-  }
-});
-
-const initializeApp = async () => {
-  try {
-    await loadState().then((state) => {
-      appState = rebuildDerivedState(state);
-    });
-    await syncAdminSession();
-  } catch (error) {
-    setAppError(error?.message || 'No se pudo cargar la aplicación.');
-    appState = rebuildDerivedState(defaultState());
-  } finally {
-    renderAll();
-    syncTournamentCreationState();
-    syncAdminTwoColumnLayout();
-    syncAdminFormLabels();
-    setActiveTab('torneo');
-    syncTournamentPanelsVisibility();
-  }
 };
 
-void initializeApp();
-window.addEventListener('DOMContentLoaded', () => {
-  function syncPlayersModalVisibility(open) {
-    if (!playersModal) return;
-    playersModal.hidden = !open;
-    playersModal.classList.toggle('is-hidden', !open);
-    playersModal.setAttribute('aria-hidden', String(!open));
+const renderCategoryRail = () => {
+  if (!categoryRail) {
+    return;
   }
 
-  if (openPlayersModal) {
-    openPlayersModal.addEventListener('click', () => {
-      setActiveTab('admin');
-      syncPlayersModalVisibility(true);
-      renderPlayers();
-    });
+  if (!appState.categories.length) {
+    categoryRail.innerHTML = '<div class="chip">No hay categorías cargadas</div>';
+    return;
   }
 
-  if (closePlayersModal) {
-    closePlayersModal.addEventListener('click', () => {
-      syncPlayersModalVisibility(false);
-    });
-  }
-
-  if (openPairsTab) {
-    openPairsTab.addEventListener('click', () => {
-      setActiveTab('parejas');
-    });
-  }
-
-  document.addEventListener('click', (event) => {
-    const target = event.target;
-    if (target && target.matches && target.matches('[data-modal-close]')) {
-      syncPlayersModalVisibility(false);
-    }
-  });
-});
-
-function getPanelByTitle(title) {
-  const candidates = Array.from(document.querySelectorAll('details, section, article, .panel, .block-card'));
-  return candidates.find((element) => {
-    const heading = element.querySelector(':scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > summary');
-    return heading && heading.textContent.trim() === title;
-  });
-}
-
-function syncTournamentPanelsVisibility() {
-  const state = getState();
-  const tournament = state?.tournament ?? {};
-  const hasActiveTournament = tournament.status !== 'Sin torneo activo' && Boolean(tournament.name);
-  const showPodium = hasActiveTournament && tournament.status === 'Torneo archivado' && Boolean(tournament.closedAt);
-
-  document.body.classList.toggle('no-active-tournament', !hasActiveTournament);
-
-  const visibilityMap = new Map([
-    ['Grupos', hasActiveTournament],
-    ['Tabla general', hasActiveTournament],
-    ['Cuadro final', hasActiveTournament],
-    ['Resultados del cuadro', hasActiveTournament],
-    ['Fixture', hasActiveTournament],
-    ['Podio', showPodium],
-  ]);
-
-  visibilityMap.forEach((shouldShow, title) => {
-    const panel = getPanelByTitle(title);
-    if (!panel) return;
-    panel.hidden = !shouldShow;
-    panel.classList.toggle('is-hidden', !shouldShow);
-    panel.setAttribute('aria-hidden', String(!shouldShow));
-  });
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  syncTournamentPanelsVisibility();
-  const observer = new MutationObserver(() => syncTournamentPanelsVisibility());
-  observer.observe(document.body, { childList: true, subtree: true });
-  setInterval(syncTournamentPanelsVisibility, 1000);
-});
-
-const historyState = {
-  activeTab: 'tournaments',
-  selectedTournamentId: null,
-  selectedPlayerId: null,
-  selectedPairId: null,
-  tournamentPlaceQuery: '',
-  tournamentParticipantQuery: '',
-  playerQuery: '',
-  pairQuery: '',
-};
-
-window.selectHistoryTab = function selectHistoryTab(tab) {
-  historyState.activeTab = tab || 'tournaments';
-  renderHistoryDashboard();
-};
-
-window.openHistoryTab = function openHistoryTab(tab) {
-  historyState.activeTab = tab || 'tournaments';
-  historyState.selectedTournamentId = null;
-  historyState.selectedPlayerId = null;
-  historyState.selectedPairId = null;
-  renderHistoryDashboard();
-};
-
-window.setHistoryQuery = function setHistoryQuery(scope, value) {
-  const text = String(value ?? '');
-  if (scope === 'tournamentPlaceQuery') {
-    historyState.tournamentPlaceQuery = text;
-  } else if (scope === 'tournamentParticipantQuery') {
-    historyState.tournamentParticipantQuery = text;
-  } else if (scope === 'playerQuery') {
-    historyState.playerQuery = text;
-  } else if (scope === 'pairQuery') {
-    historyState.pairQuery = text;
-  }
-  renderHistoryDashboard();
-};
-
-window.openHistoryTournament = function openHistoryTournament(id) {
-  historyState.selectedTournamentId = id || null;
-  renderHistoryDashboard();
-};
-
-window.openHistoryPlayer = function openHistoryPlayer(id) {
-  historyState.selectedPlayerId = id || null;
-  renderHistoryDashboard();
-};
-
-window.openHistoryPair = function openHistoryPair(id) {
-  historyState.selectedPairId = id || null;
-  renderHistoryDashboard();
-};
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
-
-function formatHistoryDate(value) {
-  if (!value) {
-    return 'Sin fecha';
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return String(value);
-  }
-  return date.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-function normalizeHistoryEntries() {
-  const state = getState();
-  const history = Array.isArray(state?.history) ? state.history : [];
-  return history
-    .map((entry, index) => {
-      const tournament = entry?.tournament ?? entry ?? {};
-      const pairs = Array.isArray(entry?.pairs) ? entry.pairs : [];
-      const matches = Array.isArray(entry?.matches) ? entry.matches : [];
-      const id = tournament.id ?? entry?.id ?? `${tournament.name ?? 'torneo'}-${index}`;
-      return {
-        id,
-        tournament,
-        pairs,
-        matches,
-        archivedAt: entry?.archivedAt ?? tournament.closedAt ?? tournament.createdAt ?? tournament.date ?? '',
-      };
+  categoryRail.innerHTML = appState.categories
+    .map((category) => {
+      const isActive = category.id === selectedCategoryId;
+      const label = category.maxPairs ? `${category.pairs.length}/${category.maxPairs}` : `${category.pairs.length}`;
+      return `
+        <button type="button" class="chip ${isActive ? 'is-success' : ''}" data-category-id="${escapeHtml(category.id)}">
+          ${escapeHtml(category.name)}
+          <span>${escapeHtml(label)}</span>
+        </button>
+      `;
     })
-    .sort((left, right) => {
-      const leftDate = new Date(left.archivedAt || left.tournament?.date || 0).getTime();
-      const rightDate = new Date(right.archivedAt || right.tournament?.date || 0).getTime();
-      return rightDate - leftDate;
-    });
-}
+    .join('');
+};
 
-function getPairLabel(pair) {
-  const players = Array.isArray(pair?.players) ? pair.players : [];
-  const names = players.map((player) => getPlayerDisplayName(player)).filter(Boolean);
-  return names.length ? names.join(' / ') : pair?.name ?? 'Pareja sin nombre';
-}
-
-function getPairSearchBlob(pair) {
-  const players = Array.isArray(pair?.players) ? pair.players : [];
-  const blobs = [
-    pair?.name,
-    pair?.alias,
-    ...players.map((player) => [
-      player?.firstName,
-      player?.lastName,
-      player?.nickname,
-      player?.fullName,
-    ].filter(Boolean).join(' ')),
-  ];
-  return blobs.filter(Boolean).join(' ').toLowerCase();
-}
-
-function getPlayerStatSearchBlob(player) {
-  return [
-    player?.firstName,
-    player?.lastName,
-    player?.name,
-    player?.nickname,
-    player?.fullName,
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-}
-
-function getTournamentSearchBlob(entry) {
-  const tournament = entry.tournament ?? {};
-  const pairBlob = (entry.pairs ?? []).map((pair) => getPairSearchBlob(pair)).join(' ');
-  return [
-    tournament.name,
-    tournament.place,
-    tournament.mode,
-    tournament.date,
-    tournament.status,
-    pairBlob,
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-}
-
-function getTeamScore(match) {
-  const teamASets = Number(match?.teamASets ?? match?.setsA ?? match?.homeSets ?? match?.scoreA ?? 0);
-  const teamBSets = Number(match?.teamBSets ?? match?.setsB ?? match?.awaySets ?? match?.scoreB ?? 0);
-  const teamAGames = Number(match?.teamAGames ?? match?.gamesA ?? match?.homeGames ?? 0);
-  const teamBGames = Number(match?.teamBGames ?? match?.gamesB ?? match?.awayGames ?? 0);
-  return { teamASets, teamBSets, teamAGames, teamBGames };
-}
-
-function buildPairHistoryStats(entries) {
-  const statsByPair = new Map();
-
-  entries.forEach((entry) => {
-    const tournament = entry.tournament ?? {};
-    const winnerId = tournament.winnerId ?? entry.winnerId ?? null;
-    const pairs = Array.isArray(entry.pairs) ? entry.pairs : [];
-    const matches = Array.isArray(entry.matches) ? entry.matches : [];
-
-    pairs.forEach((pair) => {
-      const pairId = pair?.id;
-      if (!pairId) return;
-      if (!statsByPair.has(pairId)) {
-        statsByPair.set(pairId, {
-          pairId,
-          name: getPairLabel(pair),
-          tournamentsPlayed: 0,
-          tournamentsWon: 0,
-          setsFor: 0,
-          setsAgainst: 0,
-          gamesFor: 0,
-          gamesAgainst: 0,
-        });
-      }
-      statsByPair.get(pairId).tournamentsPlayed += 1;
-      if (winnerId && winnerId === pairId) {
-        statsByPair.get(pairId).tournamentsWon += 1;
-      }
-    });
-
-    matches.forEach((match) => {
-      const pairA = pairs.find((pair) => pair?.id === (match?.pairAId ?? match?.homePairId ?? match?.leftPairId));
-      const pairB = pairs.find((pair) => pair?.id === (match?.pairBId ?? match?.awayPairId ?? match?.rightPairId));
-      if (!pairA || !pairB) return;
-      const { teamASets, teamBSets, teamAGames, teamBGames } = getTeamScore(match);
-
-      const pairAStats = statsByPair.get(pairA.id);
-      const pairBStats = statsByPair.get(pairB.id);
-      if (pairAStats) {
-        pairAStats.setsFor += teamASets;
-        pairAStats.setsAgainst += teamBSets;
-        pairAStats.gamesFor += teamAGames;
-        pairAStats.gamesAgainst += teamBGames;
-      }
-      if (pairBStats) {
-        pairBStats.setsFor += teamBSets;
-        pairBStats.setsAgainst += teamASets;
-        pairBStats.gamesFor += teamBGames;
-        pairBStats.gamesAgainst += teamAGames;
-      }
-    });
-  });
-
-  return Array.from(statsByPair.values()).sort((left, right) => {
-    if (right.tournamentsWon !== left.tournamentsWon) return right.tournamentsWon - left.tournamentsWon;
-    const leftSetDiff = left.setsFor - left.setsAgainst;
-    const rightSetDiff = right.setsFor - right.setsAgainst;
-    if (rightSetDiff !== leftSetDiff) return rightSetDiff - leftSetDiff;
-    const leftGameDiff = left.gamesFor - left.gamesAgainst;
-    const rightGameDiff = right.gamesFor - right.gamesAgainst;
-    return rightGameDiff - leftGameDiff;
-  });
-}
-
-function buildPlayerHistoryStats(entries) {
-  const statsByPlayer = new Map();
-
-  entries.forEach((entry) => {
-    const tournament = entry.tournament ?? {};
-    const winnerId = tournament.winnerId ?? entry.winnerId ?? null;
-    const pairs = Array.isArray(entry.pairs) ? entry.pairs : [];
-    const matches = Array.isArray(entry.matches) ? entry.matches : [];
-
-    pairs.forEach((pair) => {
-      const players = Array.isArray(pair?.players) ? pair.players : [];
-      players.forEach((player) => {
-        if (!player?.id) return;
-        if (!statsByPlayer.has(player.id)) {
-          statsByPlayer.set(player.id, {
-            playerId: player.id,
-            name: getPlayerDisplayName(player),
-            tournamentsPlayed: 0,
-            tournamentsWon: 0,
-            setsFor: 0,
-            setsAgainst: 0,
-            gamesFor: 0,
-            gamesAgainst: 0,
-            partners: new Map(),
-          });
-        }
-        const stat = statsByPlayer.get(player.id);
-        stat.tournamentsPlayed += 1;
-        if (winnerId && pair?.id === winnerId) {
-          stat.tournamentsWon += 1;
-        }
-      });
-    });
-
-    matches.forEach((match) => {
-      const pairA = pairs.find((pair) => pair?.id === (match?.pairAId ?? match?.homePairId ?? match?.leftPairId));
-      const pairB = pairs.find((pair) => pair?.id === (match?.pairBId ?? match?.awayPairId ?? match?.rightPairId));
-      if (!pairA || !pairB) return;
-      const { teamASets, teamBSets, teamAGames, teamBGames } = getTeamScore(match);
-
-      const pairAPlayers = Array.isArray(pairA.players) ? pairA.players : [];
-      const pairBPlayers = Array.isArray(pairB.players) ? pairB.players : [];
-
-      pairAPlayers.forEach((playerA) => {
-        const stat = statsByPlayer.get(playerA.id);
-        if (!stat) return;
-        stat.setsFor += teamASets;
-        stat.setsAgainst += teamBSets;
-        stat.gamesFor += teamAGames;
-        stat.gamesAgainst += teamBGames;
-        pairBPlayers.forEach((partner) => {
-          const label = getPlayerDisplayName(partner);
-          const partnerStat = stat.partners.get(label) ?? {
-            name: label,
-            tournamentsWon: 0,
-            setsDiff: 0,
-            gamesDiff: 0,
-          };
-          if (winnerId && pairA.id === winnerId) {
-            partnerStat.tournamentsWon += 1;
-          }
-          partnerStat.setsDiff += teamASets - teamBSets;
-          partnerStat.gamesDiff += teamAGames - teamBGames;
-          stat.partners.set(label, partnerStat);
-        });
-      });
-
-      pairBPlayers.forEach((playerB) => {
-        const stat = statsByPlayer.get(playerB.id);
-        if (!stat) return;
-        stat.setsFor += teamBSets;
-        stat.setsAgainst += teamASets;
-        stat.gamesFor += teamBGames;
-        stat.gamesAgainst += teamAGames;
-        pairAPlayers.forEach((partner) => {
-          const label = getPlayerDisplayName(partner);
-          const partnerStat = stat.partners.get(label) ?? {
-            name: label,
-            tournamentsWon: 0,
-            setsDiff: 0,
-            gamesDiff: 0,
-          };
-          if (winnerId && pairB.id === winnerId) {
-            partnerStat.tournamentsWon += 1;
-          }
-          partnerStat.setsDiff += teamBSets - teamASets;
-          partnerStat.gamesDiff += teamBGames - teamAGames;
-          stat.partners.set(label, partnerStat);
-        });
-      });
-    });
-  });
-
-  return Array.from(statsByPlayer.values())
-    .map((stat) => ({
-      ...stat,
-      idealPairs: Array.from(stat.partners.values())
-        .sort((left, right) => {
-          if (right.tournamentsWon !== left.tournamentsWon) return right.tournamentsWon - left.tournamentsWon;
-          if (right.setsDiff !== left.setsDiff) return right.setsDiff - left.setsDiff;
-          return right.gamesDiff - left.gamesDiff;
-        })
-        .slice(0, 3),
-    }))
-    .sort((left, right) => {
-      if (right.tournamentsWon !== left.tournamentsWon) return right.tournamentsWon - left.tournamentsWon;
-      const leftSetDiff = left.setsFor - left.setsAgainst;
-      const rightSetDiff = right.setsFor - right.setsAgainst;
-      if (rightSetDiff !== leftSetDiff) return rightSetDiff - leftSetDiff;
-      const leftGameDiff = left.gamesFor - left.gamesAgainst;
-      const rightGameDiff = right.gamesFor - right.gamesAgainst;
-      return rightGameDiff - leftGameDiff;
-    });
-}
-
-function renderHistoryDashboard() {
-  {
-  const root = document.getElementById('historyRoot');
-  if (!root) {
+const renderOverview = () => {
+  if (!overviewList) {
     return;
   }
 
-  const entries = normalizeHistoryEntries();
-  const placeQuery = historyState.tournamentPlaceQuery.trim().toLowerCase();
-  const participantQuery = historyState.tournamentParticipantQuery.trim().toLowerCase();
-  const playerQuery = historyState.playerQuery.trim().toLowerCase();
-  const pairQuery = historyState.pairQuery.trim().toLowerCase();
-  const hasEntries = entries.length > 0;
+  const event = appState.event || defaultState().event;
+  const eventCard = `
+    <article class="event-card">
+      <header>
+        <div>
+          <p class="eyebrow">Evento</p>
+          <h3>${escapeHtml(event.name || 'Sin evento activo')}</h3>
+        </div>
+        <span class="chip ${event.status === 'Evento archivado' ? '' : 'is-success'}">${escapeHtml(event.status || 'Sin estado')}</span>
+      </header>
+      <p class="meta">${escapeHtml(formatDateLabel(event.date))} · ${escapeHtml(event.mode || 'Sin modo')} · ${escapeHtml(event.place || 'Sin sede')}</p>
+      <div class="chips">
+        <span class="chip">Categorías: ${escapeHtml(appState.categories.length)}</span>
+        <span class="chip">Jugadores: ${escapeHtml(appState.players.length)}</span>
+      </div>
+    </article>
+  `;
 
-  const filteredEntries = entries.filter((entry) => {
-    const tournament = entry.tournament ?? {};
-    const placeMatch = !placeQuery || String(tournament.place ?? '').toLowerCase().includes(placeQuery);
-    const participantMatch = !participantQuery || getTournamentSearchBlob(entry).includes(participantQuery);
-    return placeMatch && participantMatch;
-  });
-
-  const tabsMarkup = [
-    ['tournaments', 'Torneos'],
-    ['pairs', 'Parejas'],
-    ['players', 'Jugadores'],
-  ]
-    .map(([tab, label]) => `<button class="subtab ${historyState.activeTab === tab ? 'is-active' : ''}" type="button" onclick="openHistoryTab('${tab}')">${label}</button>`)
-    .join('');
-
-  let bodyMarkup = '';
-  if (!hasEntries) {
-    bodyMarkup = `
-      <article class="history-detail-card history-empty-state">
-        <div class="history-detail-head">
+  const categoryCards = appState.categories.map((category) => {
+    const standingTop = category.standings?.slice(0, 3) || [];
+    const topLabels = standingTop.length
+      ? standingTop.map((row) => escapeHtml(row.name || row.pairLabel || 'Pareja')).join(' · ')
+      : 'Sin clasificación todavía';
+    const fixturePreview = (category.matches || [])
+      .slice(0, 3)
+      .map((match) => `${escapeHtml(match.pairALabel)} vs ${escapeHtml(match.pairBLabel)}`)
+      .join(' · ') || 'Sin partidos todavía';
+    const bracketPreview = (category.bracket || [])
+      .flatMap((round) => (round.matches || []).map((match) => `${escapeHtml(round.name)}: ${escapeHtml(match.pairALabel)} vs ${escapeHtml(match.pairBLabel)}`))
+      .slice(0, 3)
+      .join(' · ') || 'Sin cuadro todavía';
+    const capacity = category.maxPairs ? `${category.pairs.length}/${category.maxPairs}` : `${category.pairs.length}`;
+    return `
+      <article class="category-card">
+        <header>
           <div>
-            <p class="eyebrow">Historial vacío</p>
-            <h3>No hay torneos archivados todavía</h3>
-            <p class="muted">Cuando cierres un torneo, va a aparecer acá con sus torneos, parejas y jugadores.</p>
+            <p class="eyebrow">Categoría</p>
+            <h3>${escapeHtml(category.name)}</h3>
           </div>
+          <span class="chip ${category.status === 'Torneo archivado' ? '' : 'is-success'}">${escapeHtml(category.status)}</span>
+        </header>
+        <p class="meta">Parejas ${escapeHtml(capacity)} · ${escapeHtml(category.groups.length)} grupos · ${escapeHtml(category.matches.length)} partidos</p>
+        <div class="chips">
+          <span class="chip">Top: ${topLabels}</span>
+        </div>
+        <div class="grid-two">
+          <div class="match-card">
+            <p class="eyebrow">Tabla</p>
+            <p class="meta">${topLabels}</p>
+          </div>
+          <div class="match-card">
+            <p class="eyebrow">Fixture</p>
+            <p class="meta">${fixturePreview}</p>
+          </div>
+          <div class="match-card">
+            <p class="eyebrow">Cuadro</p>
+            <p class="meta">${bracketPreview}</p>
+          </div>
+        </div>
+        <div class="card-actions">
+          <button type="button" class="secondary" data-category-id="${escapeHtml(category.id)}">Ver categoría</button>
         </div>
       </article>
     `;
-  } else if (historyState.activeTab === 'tournaments') {
-    const selectedEntry = filteredEntries.find((entry) => entry.id === historyState.selectedTournamentId) ?? filteredEntries[0] ?? null;
-    bodyMarkup = `
-      <div class="history-filters">
-        <label>
-          <span>Filtro por lugar</span>
-          <input type="search" value="${escapeHtml(historyState.tournamentPlaceQuery)}" oninput="setHistoryQuery('tournamentPlaceQuery', this.value)" placeholder="Buscar lugar" />
-        </label>
-        <label>
-          <span>Filtro por participante</span>
-          <input type="search" value="${escapeHtml(historyState.tournamentParticipantQuery)}" oninput="setHistoryQuery('tournamentParticipantQuery', this.value)" placeholder="Buscar jugador o pareja" />
-        </label>
-      </div>
-      <div class="history-view-grid">
-        <div class="history-list">
-          ${filteredEntries.length ? filteredEntries.map((entry) => {
-            const tournament = entry.tournament ?? {};
-            const isSelected = selectedEntry?.id === entry.id;
-            const winners = Array.isArray(entry.pairs) ? entry.pairs.filter((pair) => pair?.id === tournament.winnerId).map((pair) => getPairLabel(pair)).join(' / ') : '';
-            return `
-              <button class="history-item ${isSelected ? 'is-selected' : ''}" type="button" onclick="openHistoryTournament('${escapeHtml(entry.id)}')">
-                <strong>${escapeHtml(tournament.name ?? 'Torneo sin nombre')}</strong>
-                <span>${escapeHtml(formatHistoryDate(tournament.date ?? entry.archivedAt))} · ${escapeHtml(tournament.place ?? 'Sin lugar')}</span>
-                <span>${escapeHtml(tournament.mode ?? 'Sin modo')} · ${escapeHtml(entry.pairs?.length ?? 0)} parejas</span>
-                <span>${escapeHtml(winners || 'Ganador no declarado')}</span>
-              </button>
-            `;
-          }).join('') : '<div class="empty-state">No hay torneos archivados.</div>'}
-        </div>
-        <div class="history-detail">
-          ${selectedEntry ? renderHistoryTournamentDetail(selectedEntry) : '<div class="empty-state">Seleccioná un torneo para ver el detalle.</div>'}
-        </div>
-      </div>
-    `;
-  } else if (historyState.activeTab === 'players') {
-    const playerStats = buildPlayerHistoryStats(entries);
-    const filteredPlayers = playerStats.filter((player) => !playerQuery || getPlayerStatSearchBlob(player).includes(playerQuery));
-    const selectedPlayer = filteredPlayers.find((player) => player.playerId === historyState.selectedPlayerId) ?? filteredPlayers[0] ?? null;
-    bodyMarkup = `
-      <label class="history-search">
-        <span>Buscar jugador</span>
-        <input type="search" value="${escapeHtml(historyState.playerQuery)}" oninput="setHistoryQuery('playerQuery', this.value)" placeholder="Nombre, apellido o alias" />
-      </label>
-      <div class="history-detail">
-        ${selectedPlayer ? renderHistoryPlayerDetail(selectedPlayer) : '<div class="empty-state">Seleccioná un jugador para ver el detalle.</div>'}
-      </div>
-      <div class="history-grid">
-        ${filteredPlayers.map((player) => `
-          <button class="history-stat-card history-stat-button ${selectedPlayer?.playerId === player.playerId ? 'is-selected' : ''}" type="button" onclick="openHistoryPlayer('${escapeHtml(player.playerId)}')">
-            <div class="history-stat-head">
-              <strong>${escapeHtml(player.name)}</strong>
-              <span>${player.tournamentsWon} torneos ganados</span>
-            </div>
-            <div class="history-stat-metrics">
-              <div><span>Torneos</span><strong>${player.tournamentsPlayed}</strong></div>
-              <div><span>Ganados</span><strong>${player.tournamentsWon}</strong></div>
-              <div><span>Sets</span><strong>${player.setsFor}-${player.setsAgainst}</strong></div>
-              <div><span>Games</span><strong>${player.gamesFor}-${player.gamesAgainst}</strong></div>
-            </div>
-            <div class="ideal-pairs">
-              <span>Parejas ideales</span>
-              <small>${player.idealPairs.length ? player.idealPairs.map((pair) => escapeHtml(pair.name)).join(' · ') : 'Sin datos suficientes'}</small>
-            </div>
-          </button>
-        `).join('')}
-      </div>
-    `;
-  } else if (historyState.activeTab === 'pairs') {
-    const pairStats = buildPairHistoryStats(entries);
-    const filteredPairs = pairStats.filter((pair) => !pairQuery || getPairSearchBlob(pair).includes(pairQuery));
-    const selectedPair = filteredPairs.find((pair) => pair.pairId === historyState.selectedPairId) ?? filteredPairs[0] ?? null;
-    bodyMarkup = `
-      <label class="history-search">
-        <span>Buscar pareja</span>
-        <input type="search" value="${escapeHtml(historyState.pairQuery)}" oninput="setHistoryQuery('pairQuery', this.value)" placeholder="Nombre, apellido o alias" />
-      </label>
-      <div class="history-detail">
-        ${selectedPair ? renderHistoryPairDetail(selectedPair) : '<div class="empty-state">Seleccioná una pareja para ver el detalle.</div>'}
-      </div>
-      <div class="history-grid">
-        ${filteredPairs.map((pair) => `
-          <button class="history-stat-card history-stat-button ${selectedPair?.pairId === pair.pairId ? 'is-selected' : ''}" type="button" onclick="openHistoryPair('${escapeHtml(pair.pairId)}')">
-            <div class="history-stat-head">
-              <strong>${escapeHtml(pair.name)}</strong>
-              <span>${pair.tournamentsWon} torneos ganados</span>
-            </div>
-            <div class="history-stat-metrics">
-              <div><span>Torneos</span><strong>${pair.tournamentsPlayed}</strong></div>
-              <div><span>Ganados</span><strong>${pair.tournamentsWon}</strong></div>
-              <div><span>Sets</span><strong>${pair.setsFor}-${pair.setsAgainst}</strong></div>
-              <div><span>Games</span><strong>${pair.gamesFor}-${pair.gamesAgainst}</strong></div>
-            </div>
-          </button>
-        `).join('')}
-      </div>
-    `;
+  });
+
+  overviewList.innerHTML = [eventCard, ...categoryCards].join('');
+};
+
+const renderFixture = () => {
+  if (!fixtureList) {
+    return;
   }
 
-  root.innerHTML = `
-    <span class="card-label">Torneos guardados</span>
-    <div class="subtabs" role="tablist" aria-label="Historial">
-      ${tabsMarkup}
-    </div>
-    <div class="history-view">
-      ${bodyMarkup}
-    </div>
-  `;
-  return;
+  const category = getSelectedCategory();
+  if (!category) {
+    fixtureList.innerHTML = '<div class="card">No hay categoría seleccionada.</div>';
+    return;
   }
-}
 
-function renderHistoryTournamentDetail(entry) {
-  const tournament = entry.tournament ?? {};
-  const pairs = Array.isArray(entry.pairs) ? entry.pairs : [];
-  const matches = Array.isArray(entry.matches) ? entry.matches : [];
-  const winner = pairs.find((pair) => pair?.id === tournament.winnerId);
-  const pairRows = pairs.length
-    ? pairs.map((pair) => `
-      <div class="history-inline-row">
-        <strong>${escapeHtml(getPairLabel(pair))}</strong>
-        <span>${escapeHtml(pair.id === tournament.winnerId ? 'Campeón' : 'Participante')}</span>
-      </div>
-    `).join('')
-    : '<div class="empty-state">Sin parejas archivadas.</div>';
+  const matches = [...(category.matches || [])];
+  if (!matches.length) {
+    fixtureList.innerHTML = '<div class="card">Todavía no hay partidos generados para esta categoría.</div>';
+    return;
+  }
 
-  const matchRows = matches.length
-    ? matches.map((match) => {
-      const pairA = pairs.find((pair) => pair?.id === (match?.pairAId ?? match?.homePairId ?? match?.leftPairId));
-      const pairB = pairs.find((pair) => pair?.id === (match?.pairBId ?? match?.awayPairId ?? match?.rightPairId));
-      const { teamASets, teamBSets, teamAGames, teamBGames } = getTeamScore(match);
+  const groupedByDate = matches.reduce((accumulator, match) => {
+    const key = match.date || 'Sin fecha';
+    if (!accumulator[key]) {
+      accumulator[key] = [];
+    }
+
+    accumulator[key].push(match);
+    return accumulator;
+  }, {});
+
+  fixtureList.innerHTML = Object.entries(groupedByDate)
+    .map(([dateLabel, dayMatches]) => {
+      const cards = dayMatches
+        .map((match) => {
+          const winnerLabel = match.winnerId === match.pairAId
+            ? match.pairALabel
+            : match.winnerId === match.pairBId
+              ? match.pairBLabel
+              : 'Pendiente';
+
+          const adminBlock = isAdminUnlocked()
+            ? `
+              <details class="fixture-editor">
+                <summary class="secondary">Editar día y hora</summary>
+                <form class="admin-form" data-match-form="${escapeHtml(match.id)}">
+                  <label>
+                    Fecha
+                    <input name="date" type="date" value="${escapeHtml(match.date || '')}" />
+                  </label>
+                  <label>
+                    Hora
+                    <input name="time" type="time" value="${escapeHtml(match.time || '')}" />
+                  </label>
+                  <label>
+                    Sede
+                    <input name="venue" type="text" value="${escapeHtml(match.venue || '')}" />
+                  </label>
+                  <label>
+                    Sets A
+                    <input name="setsA" type="number" min="0" value="${escapeHtml(match.setsA ?? '')}" />
+                  </label>
+                  <label>
+                    Sets B
+                    <input name="setsB" type="number" min="0" value="${escapeHtml(match.setsB ?? '')}" />
+                  </label>
+                  <label>
+                    Games A
+                    <input name="gamesA" type="number" min="0" value="${escapeHtml(match.gamesA ?? '')}" />
+                  </label>
+                  <label>
+                    Games B
+                    <input name="gamesB" type="number" min="0" value="${escapeHtml(match.gamesB ?? '')}" />
+                  </label>
+                  <label>
+                    Ganador
+                    <select name="winnerId">
+                      <option value="">Pendiente</option>
+                      <option value="${escapeHtml(match.pairAId)}" ${match.winnerId === match.pairAId ? 'selected' : ''}>${escapeHtml(match.pairALabel)}</option>
+                      <option value="${escapeHtml(match.pairBId)}" ${match.winnerId === match.pairBId ? 'selected' : ''}>${escapeHtml(match.pairBLabel)}</option>
+                    </select>
+                  </label>
+                  <button type="submit" class="primary">Guardar resultado</button>
+                </form>
+              </details>
+            `
+            : '';
+
+          return `
+            <article class="match-card">
+              <header>
+                <div>
+                  <p class="eyebrow">${escapeHtml(match.roundName || match.stage || 'Partido')}</p>
+                  <h3>${escapeHtml(match.pairALabel)} vs ${escapeHtml(match.pairBLabel)}</h3>
+                </div>
+                <span class="chip ${match.played ? 'is-success' : ''}">${escapeHtml(winnerLabel)}</span>
+              </header>
+              <p class="match-meta">${escapeHtml(formatDateTimeLabel(match.date, match.time))} · ${escapeHtml(match.venue || 'Sin sede')}</p>
+              <p class="meta">Sets ${escapeHtml(match.setsA ?? '-')} - ${escapeHtml(match.setsB ?? '-')} · Games ${escapeHtml(match.gamesA ?? '-')} - ${escapeHtml(match.gamesB ?? '-')}</p>
+              ${adminBlock}
+            </article>
+          `;
+        })
+        .join('');
+
       return `
-        <div class="history-match-row">
-          <strong>${escapeHtml(getPairLabel(pairA))}</strong>
-          <span>${teamASets}-${teamBSets} sets</span>
-          <span>${teamAGames}-${teamBGames} games</span>
-          <strong>${escapeHtml(getPairLabel(pairB))}</strong>
-        </div>
+        <article class="fixture-day">
+          <header>
+            <p class="day-label">${escapeHtml(dateLabel)}</p>
+            <p class="meta">${escapeHtml(dayMatches.length)} partido${dayMatches.length === 1 ? '' : 's'}</p>
+          </header>
+          <div class="stack-list">${cards}</div>
+        </article>
       `;
-    }).join('')
-    : '<div class="empty-state">Sin partidos archivados.</div>';
+    })
+    .join('');
+};
 
-  return `
-    <article class="history-detail-card">
-      <div class="history-detail-head">
-        <div>
-          <p class="eyebrow">Detalle</p>
-          <h3>${escapeHtml(tournament.name ?? 'Torneo sin nombre')}</h3>
-          <p class="muted">${escapeHtml(formatHistoryDate(tournament.date ?? entry.archivedAt))} · ${escapeHtml(tournament.place ?? 'Sin lugar')} · ${escapeHtml(tournament.mode ?? 'Sin modo')}</p>
-        </div>
-      </div>
-      <div class="history-detail-grid">
-        <div><span>Estado</span><strong>${escapeHtml(tournament.status ?? 'Archivado')}</strong></div>
-        <div><span>Ganador</span><strong>${escapeHtml(winner ? getPairLabel(winner) : 'Sin ganador')}</strong></div>
-        <div><span>Parejas</span><strong>${pairs.length}</strong></div>
-        <div><span>Partidos</span><strong>${matches.length}</strong></div>
-        <div><span>Lugar</span><strong>${escapeHtml(tournament.place ?? 'Sin lugar')}</strong></div>
-        <div><span>Modo</span><strong>${escapeHtml(tournament.mode ?? 'Sin modo')}</strong></div>
-      </div>
-      <div class="history-section">
-        <div class="history-section-head">
-          <strong>Parejas</strong>
-          <span>${pairs.length}</span>
-        </div>
-        <div class="history-pairs-list">
-          ${pairRows}
-        </div>
-      </div>
-      <div class="history-section">
-        <div class="history-section-head">
-          <strong>Partidos</strong>
-          <span>${matches.length}</span>
-        </div>
-        <div class="history-matches-list">
-          ${matchRows}
-        </div>
-      </div>
-    </article>
+const renderStandings = () => {
+  if (!standingsList) {
+    return;
+  }
+
+  const category = getSelectedCategory();
+  if (!category) {
+    standingsList.innerHTML = '<div class="card">No hay categoría seleccionada.</div>';
+    return;
+  }
+
+  const rows = category.standings || [];
+  if (!rows.length) {
+    standingsList.innerHTML = '<div class="card">Todavía no hay tabla generada.</div>';
+    return;
+  }
+
+  standingsList.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Pareja</th>
+          <th>PJ</th>
+          <th>PTS</th>
+          <th>SETS</th>
+          <th>GAMES</th>
+          <th>DS</th>
+          <th>DG</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows
+          .map((row, index) => {
+            const setsFor = Number(row.setsFor ?? row.sets_for ?? 0);
+            const setsAgainst = Number(row.setsAgainst ?? row.sets_against ?? 0);
+            const gamesFor = Number(row.gamesFor ?? row.games_for ?? 0);
+            const gamesAgainst = Number(row.gamesAgainst ?? row.games_against ?? 0);
+            const matchesPlayed = Number(row.matchesPlayed ?? row.matches_played ?? 0);
+            const points = Number(row.points ?? 0);
+            const setDiff = setsFor - setsAgainst;
+            const gameDiff = gamesFor - gamesAgainst;
+            return `
+              <tr class="table-row ${index < 3 ? 'is-top' : ''}">
+                <td>${escapeHtml(row.name || row.pairLabel || 'Pareja')}</td>
+                <td>${escapeHtml(matchesPlayed)}</td>
+                <td>${escapeHtml(points)}</td>
+                <td>${escapeHtml(`${setsFor}-${setsAgainst}`)}</td>
+                <td>${escapeHtml(`${gamesFor}-${gamesAgainst}`)}</td>
+                <td>${escapeHtml(setDiff)}</td>
+                <td>${escapeHtml(gameDiff)}</td>
+              </tr>
+            `;
+          })
+          .join('')}
+      </tbody>
+    </table>
   `;
-}
+};
 
-function renderHistoryPairDetail(pair) {
-  const pairedPlayers = Array.isArray(pair?.players) ? pair.players : [];
-  return `
-    <article class="history-detail-card">
-      <div class="history-detail-head">
-        <div>
-          <p class="eyebrow">Detalle de pareja</p>
-          <h3>${escapeHtml(pair.name)}</h3>
-          <p class="muted">${pairedPlayers.map((player) => escapeHtml(getPlayerDisplayName(player))).join(' · ')}</p>
-        </div>
-      </div>
-      <div class="history-detail-grid">
-        <div><span>Torneos jugados</span><strong>${pair.tournamentsPlayed}</strong></div>
-        <div><span>Torneos ganados</span><strong>${pair.tournamentsWon}</strong></div>
-        <div><span>Sets</span><strong>${pair.setsFor}-${pair.setsAgainst}</strong></div>
-        <div><span>Games</span><strong>${pair.gamesFor}-${pair.gamesAgainst}</strong></div>
-      </div>
-      <div class="history-section">
-        <div class="history-section-head">
-          <strong>Integrantes</strong>
-          <span>${pairedPlayers.length}</span>
-        </div>
-        <div class="history-pairs-list">
-          ${pairedPlayers.length ? pairedPlayers.map((player) => `
-            <div class="history-inline-row">
-              <strong>${escapeHtml(getPlayerDisplayName(player))}</strong>
-              <span>${escapeHtml(player.fullName ?? `${player.firstName ?? ''} ${player.lastName ?? ''}`.trim())}</span>
+const renderGroups = () => {
+  if (!groupsList) {
+    return;
+  }
+
+  const category = getSelectedCategory();
+  if (!category) {
+    groupsList.innerHTML = '<div class="card">No hay categoría seleccionada.</div>';
+    return;
+  }
+
+  const groups = category.groups || [];
+  if (!groups.length) {
+    groupsList.innerHTML = '<div class="card">Todavía no hay grupos generados.</div>';
+    return;
+  }
+
+  groupsList.innerHTML = groups
+    .map((group) => {
+      const pairNames = (group.pairs || []).map((pair) => escapeHtml(getPairLabel(pair))).join(' · ') || 'Sin parejas';
+      return `
+        <article class="match-card">
+          <header>
+            <div>
+              <p class="eyebrow">${escapeHtml(group.name || 'Grupo')}</p>
+              <h3>${escapeHtml(group.name || 'Grupo')}</h3>
             </div>
-          `).join('') : '<div class="empty-state">Sin integrantes registrados.</div>'}
-        </div>
-      </div>
-    </article>
-  `;
-}
+            <span class="chip">${escapeHtml((group.pairs || []).length)} parejas</span>
+          </header>
+          <p class="meta">${pairNames}</p>
+        </article>
+      `;
+    })
+    .join('');
+};
 
-function renderHistoryPlayerDetail(player) {
-  const idealPairs = Array.isArray(player.idealPairs) ? player.idealPairs : [];
-  return `
-    <article class="history-detail-card">
-      <div class="history-detail-head">
-        <div>
-          <p class="eyebrow">Detalle de jugador</p>
-          <h3>${escapeHtml(player.name)}</h3>
-          <p class="muted">${escapeHtml(player.name)}</p>
-        </div>
-      </div>
-      <div class="history-detail-grid">
-        <div><span>Torneos jugados</span><strong>${player.tournamentsPlayed}</strong></div>
-        <div><span>Torneos ganados</span><strong>${player.tournamentsWon}</strong></div>
-        <div><span>Sets</span><strong>${player.setsFor}-${player.setsAgainst}</strong></div>
-        <div><span>Games</span><strong>${player.gamesFor}-${player.gamesAgainst}</strong></div>
-      </div>
-      <div class="history-section">
-        <div class="history-section-head">
-          <strong>Parejas ideales</strong>
-          <span>${idealPairs.length}</span>
-        </div>
-        <div class="history-pairs-list">
-          ${idealPairs.length ? idealPairs.map((pair) => `
-            <div class="history-inline-row">
-              <strong>${escapeHtml(pair.name)}</strong>
-              <span>${pair.tournamentsWon} éxitos</span>
+const renderBracket = () => {
+  if (!bracketList) {
+    return;
+  }
+
+  const category = getSelectedCategory();
+  if (!category) {
+    bracketList.innerHTML = '<div class="card">No hay categoría seleccionada.</div>';
+    return;
+  }
+
+  const rounds = category.bracket || [];
+  if (!rounds.length) {
+    bracketList.innerHTML = '<div class="card">Todavía no hay cuadro generado.</div>';
+    return;
+  }
+
+  bracketList.innerHTML = rounds
+    .map(
+      (round) => `
+        <article class="standings-card">
+          <header>
+            <div>
+              <p class="eyebrow">${escapeHtml(round.name)}</p>
+              <h3>${escapeHtml(round.name)}</h3>
             </div>
-          `).join('') : '<div class="empty-state">Sin datos suficientes.</div>'}
-        </div>
-      </div>
-    </article>
-  `;
-}
+          </header>
+          <div class="stack-list">
+            ${(round.matches || [])
+              .map(
+                (match) => `
+                  <div class="match-card">
+                    <strong>${escapeHtml(match.pairALabel || 'Pendiente')} vs ${escapeHtml(match.pairBLabel || 'Pendiente')}</strong>
+                    <p class="meta">Estado: ${escapeHtml(match.played ? 'Jugado' : 'Pendiente')}</p>
+                    <p class="meta">Ganador: ${escapeHtml(match.winnerId ? (category.pairs.find((pair) => pair.id === match.winnerId)?.name || 'Pendiente') : 'Pendiente')}</p>
+                  </div>
+                `,
+              )
+              .join('')}
+          </div>
+        </article>
+      `,
+    )
+    .join('');
+};
 
+const renderBracketResults = () => {
+  if (!bracketResultsList) {
+    return;
+  }
+
+  const category = getSelectedCategory();
+  if (!category) {
+    bracketResultsList.innerHTML = '<div class="card">No hay categoría seleccionada.</div>';
+    return;
+  }
+
+  const playedMatches = category.matches?.filter((match) => match.played) || [];
+  if (!playedMatches.length) {
+    bracketResultsList.innerHTML = '<div class="card">Todavía no hay resultados de cuadro.</div>';
+    return;
+  }
+
+  bracketResultsList.innerHTML = playedMatches
+    .map(
+      (match) => `
+        <article class="result-card">
+          <strong>${escapeHtml(match.pairALabel)} vs ${escapeHtml(match.pairBLabel)}</strong>
+          <p class="result-meta">${escapeHtml(match.roundName || match.stage || 'Partido')} · Ganador: ${escapeHtml(match.winnerId ? (category.pairs.find((pair) => pair.id === match.winnerId)?.name || 'Pendiente') : 'Pendiente')}</p>
+        </article>
+      `,
+    )
+    .join('');
+};
+
+const renderRules = () => {
+  if (!rulesList) {
+    return;
+  }
+
+  rulesList.innerHTML = rules.map((rule) => `<li>${escapeHtml(rule)}</li>`).join('');
+};
+
+const renderPairs = () => {
+  if (!pairsList) {
+    return;
+  }
+
+  const category = getSelectedCategory();
+  if (!category) {
+    pairsList.innerHTML = '<div class="card">No hay categoría seleccionada.</div>';
+    return;
+  }
+
+  const pairCards = (category.pairs || []).map((pair) => {
+    const cardActions = isAdminUnlocked()
+      ? `
+        <div class="card-actions">
+          <button type="button" class="secondary" data-edit-pair="${escapeHtml(pair.id)}">Editar</button>
+          <button type="button" class="secondary is-danger" data-delete-pair="${escapeHtml(pair.id)}">Borrar</button>
+        </div>
+      `
+      : '';
+
+    return `
+      <article class="pair-card">
+        <header>
+          <div>
+            <p class="eyebrow">Pareja</p>
+            <h3>${escapeHtml(getPairLabel(pair))}</h3>
+          </div>
+        </header>
+        <p class="meta">${escapeHtml(getPlayerLabel(pair.playerOne))} / ${escapeHtml(getPlayerLabel(pair.playerTwo))}</p>
+        ${cardActions}
+      </article>
+    `;
+  });
+
+  const waitlistCards = (category.waitlist || []).map(
+    (entry) => `
+      <article class="waitlist-card">
+        <header>
+          <div>
+            <p class="eyebrow">Lista de espera</p>
+            <h3>${escapeHtml(getPlayerLabel(entry.player))} / ${escapeHtml(getPlayerLabel(entry.partner))}</h3>
+          </div>
+          <span class="chip">${escapeHtml(entry.status || 'pendiente')}</span>
+        </header>
+        <p class="meta">Solicitado: ${escapeHtml(entry.requestedAt ? new Date(entry.requestedAt).toLocaleString('es-AR') : 'Sin fecha')}</p>
+      </article>
+    `,
+  );
+
+  pairsList.innerHTML = [...pairCards, ...waitlistCards].join('') || '<div class="card">No hay parejas cargadas.</div>';
+};
+
+const renderHistory = () => {
+  if (!historyRoot) {
+    return;
+  }
+
+  if (!appState.history.length) {
+    historyRoot.innerHTML = '<div class="card">No hay torneos archivados todavía.</div>';
+    return;
+  }
+
+  historyRoot.innerHTML = appState.history
+    .map((entry) => {
+      const categories = entry.categories || [];
+      return `
+        <article class="history-card">
+          <header>
+            <div>
+              <p class="eyebrow">Historial</p>
+              <h3>${escapeHtml(entry.event?.name || 'Evento archivado')}</h3>
+            </div>
+            <span class="chip">${escapeHtml(entry.event?.status || 'Archivado')}</span>
+          </header>
+          <p class="meta">${escapeHtml(formatDateLabel(entry.event?.date))} · ${escapeHtml(entry.event?.place || '')}</p>
+          <div class="stack-list">
+            ${categories
+              .map(
+                (item) => `
+                  <div class="match-card">
+                    <strong>${escapeHtml(item.category?.name || 'Categoría')}</strong>
+                    <p class="meta">Archivada: ${escapeHtml(item.archivedAt ? new Date(item.archivedAt).toLocaleString('es-AR') : 'Sin fecha')}</p>
+                    <p class="meta">Estado: ${escapeHtml(item.category?.status || 'Archivada')}</p>
+                  </div>
+                `,
+              )
+              .join('')}
+          </div>
+        </article>
+      `;
+    })
+    .join('');
+};
+
+const renderPlayersModal = () => {
+  if (!playersList) {
+    return;
+  }
+
+  if (!appState.players.length) {
+    playersList.innerHTML = '<div class="card">No hay jugadores cargados.</div>';
+    return;
+  }
+
+  playersList.innerHTML = appState.players
+    .map((player) => {
+      const actions = isAdminUnlocked()
+        ? `
+          <div class="card-actions">
+            <button type="button" class="secondary" data-edit-player="${escapeHtml(player.id)}">Editar</button>
+            <button type="button" class="secondary is-danger" data-delete-player="${escapeHtml(player.id)}">Borrar</button>
+          </div>
+        `
+        : '';
+
+      return `
+        <article class="player-card">
+          <header>
+            <div>
+              <p class="eyebrow">Jugador</p>
+              <h3>${escapeHtml(getPlayerLabel(player))}</h3>
+            </div>
+            <span class="chip">${escapeHtml(player.accountStatus || 'sin_cuenta')}</span>
+          </header>
+          <p class="meta">${escapeHtml(player.firstName)} ${escapeHtml(player.lastName)}</p>
+          ${player.email ? `<p class="meta">${escapeHtml(player.email)}</p>` : ''}
+          ${actions}
+        </article>
+      `;
+    })
+    .join('');
+};
+
+const renderAdminState = () => {
+  const unlocked = isAdminUnlocked();
+  if (adminLock) {
+    adminLock.hidden = unlocked;
+  }
+  if (adminContent) {
+    adminContent.hidden = !unlocked;
+  }
+  if (adminLoginError && !unlocked) {
+    setAdminLoginError('');
+  }
+
+  const event = appState.event || defaultState().event;
+  const activeCategory = getSelectedCategory();
+
+  if (eventNameInput) {
+    eventNameInput.value = event.name || '';
+  }
+  if (eventDateInput) {
+    eventDateInput.value = event.date || '';
+  }
+  if (eventModeInput) {
+    eventModeInput.value = event.mode || '';
+  }
+  if (eventPlaceInput) {
+    eventPlaceInput.value = event.place || '';
+  }
+  if (eventCategoryNameInput) {
+    eventCategoryNameInput.value = activeCategory?.name || '';
+  }
+  if (eventMaxPairsInput) {
+    eventMaxPairsInput.value = activeCategory?.maxPairs ?? '';
+  }
+  if (categoryNameInput) {
+    categoryNameInput.value = '';
+  }
+  if (categoryMaxPairsInput) {
+    categoryMaxPairsInput.value = '';
+  }
+
+  const categoryOptions = appState.categories
+    .map(
+      (category) => `
+        <option value="${escapeHtml(category.id)}" ${category.id === selectedCategoryId ? 'selected' : ''}>${escapeHtml(category.name)}</option>
+      `,
+    )
+    .join('');
+
+  if (categorySelect) {
+    categorySelect.innerHTML = categoryOptions || '<option value="">Sin categorías</option>';
+    if (selectedCategoryId) {
+      categorySelect.value = selectedCategoryId;
+    }
+  }
+
+  if (adminCategorySelect) {
+    adminCategorySelect.innerHTML = categoryOptions || '<option value="">Sin categorías</option>';
+    if (selectedCategoryId) {
+      adminCategorySelect.value = selectedCategoryId;
+    }
+  }
+
+  if (pairCategorySelect) {
+    pairCategorySelect.innerHTML = categoryOptions || '<option value="">Sin categorías</option>';
+    if (selectedCategoryId) {
+      pairCategorySelect.value = selectedCategoryId;
+    }
+  }
+
+  if (categoryWinnerSelect) {
+    const selected = activeCategory || appState.categories[0] || null;
+    categoryWinnerSelect.innerHTML = selected
+      ? ['<option value="">Pendiente</option>', ...(selected.pairs || []).map((pair) => `<option value="${escapeHtml(pair.id)}">${escapeHtml(getPairLabel(pair))}</option>`)].join('')
+      : '<option value="">Sin parejas</option>';
+  }
+
+  if (playerOneSelect) {
+    playerOneSelect.innerHTML = appState.players
+      .map((player) => `<option value="${escapeHtml(player.id)}">${escapeHtml(getPlayerLabel(player))}</option>`)
+      .join('');
+  }
+
+  if (playerTwoSelect) {
+    playerTwoSelect.innerHTML = appState.players
+      .map((player) => `<option value="${escapeHtml(player.id)}">${escapeHtml(getPlayerLabel(player))}</option>`)
+      .join('');
+  }
+
+  if (activeCategory && pairCategorySelect) {
+    pairCategorySelect.value = activeCategory.id;
+  }
+};
+
+const renderMatchEditor = () => {
+  if (!matchEditorList) {
+    return;
+  }
+
+  if (!isAdminUnlocked()) {
+    matchEditorList.innerHTML = '<div class="card">Iniciá sesión para editar partidos.</div>';
+    return;
+  }
+
+  const category = getSelectedCategory();
+  if (!category) {
+    matchEditorList.innerHTML = '<div class="card">No hay categoría seleccionada.</div>';
+    return;
+  }
+
+  const matches = category.matches || [];
+  if (!matches.length) {
+    matchEditorList.innerHTML = '<div class="card">Planificá la categoría para editar sus partidos.</div>';
+    return;
+  }
+
+  matchEditorList.innerHTML = matches
+    .map(
+      (match) => `
+        <details class="match-card">
+          <summary>
+            <div>
+              <p class="eyebrow">${escapeHtml(match.roundName || match.stage || 'Partido')}</p>
+              <h3>${escapeHtml(match.pairALabel)} vs ${escapeHtml(match.pairBLabel)}</h3>
+            </div>
+            <span class="chip">${escapeHtml(match.played ? 'Jugado' : 'Pendiente')}</span>
+          </summary>
+          <form class="admin-form" data-match-form="${escapeHtml(match.id)}">
+            <label>
+              Fecha
+              <input name="date" type="date" value="${escapeHtml(match.date || '')}" />
+            </label>
+            <label>
+              Hora
+              <input name="time" type="time" value="${escapeHtml(match.time || '')}" />
+            </label>
+            <label>
+              Sede
+              <input name="venue" type="text" value="${escapeHtml(match.venue || '')}" />
+            </label>
+            <label>
+              Sets A
+              <input name="setsA" type="number" min="0" value="${escapeHtml(match.setsA ?? '')}" />
+            </label>
+            <label>
+              Sets B
+              <input name="setsB" type="number" min="0" value="${escapeHtml(match.setsB ?? '')}" />
+            </label>
+            <label>
+              Games A
+              <input name="gamesA" type="number" min="0" value="${escapeHtml(match.gamesA ?? '')}" />
+            </label>
+            <label>
+              Games B
+              <input name="gamesB" type="number" min="0" value="${escapeHtml(match.gamesB ?? '')}" />
+            </label>
+            <label>
+              Ganador
+              <select name="winnerId">
+                <option value="">Pendiente</option>
+                <option value="${escapeHtml(match.pairAId)}" ${match.winnerId === match.pairAId ? 'selected' : ''}>${escapeHtml(match.pairALabel)}</option>
+                <option value="${escapeHtml(match.pairBId)}" ${match.winnerId === match.pairBId ? 'selected' : ''}>${escapeHtml(match.pairBLabel)}</option>
+              </select>
+            </label>
+            <button type="submit" class="primary">Guardar partido</button>
+          </form>
+        </details>
+      `,
+    )
+    .join('');
+};
+
+const renderAll = () => {
+  renderTabs();
+  renderEventHeader();
+  renderCategoryRail();
+  renderOverview();
+  renderFixture();
+  renderGroups();
+  renderStandings();
+  renderBracket();
+  renderBracketResults();
+  renderRules();
+  renderPairs();
+  renderHistory();
+  renderAdminState();
+  renderPlayersModal();
+  renderMatchEditor();
+};
+
+const runAction = async (task, feedback) => {
+  setAppError('');
+  try {
+    const result = await task();
+    return result;
+  } catch (error) {
+    if (error?.status === 401) {
+      forceLockAdmin();
+      renderAll();
+    }
+
+    const message = feedback || error?.message || 'No se pudo completar la acción.';
+    setAppError(message);
+    throw error;
+  }
+};
+
+const mutate = async (task, feedback) => {
+  try {
+    await runAction(task, feedback);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const submitPlayerForm = async (event) => {
+  event.preventDefault();
+  if (!isAdminUnlocked()) {
+    return;
+  }
+
+  const form = event.currentTarget;
+  setBusy(form, true);
+
+  try {
+    const payload = {
+      firstName: normalizeText(playerFirstName?.value || ''),
+      lastName: normalizeText(playerLastName?.value || ''),
+      nickname: normalizeText(playerAlias?.value || ''),
+    };
+
+    if (!(await mutate(async () => {
+      if (playerId?.value) {
+        await updatePlayer(playerId.value, payload);
+      } else {
+        await createPlayer(payload);
+      }
+    }))) {
+      return;
+    }
+
+    if (playerForm) {
+      playerForm.reset();
+      if (playerId) {
+        playerId.value = '';
+      }
+    }
+    await reloadState();
+    renderAll();
+  } finally {
+    setBusy(form, false);
+  }
+};
+
+const submitPairForm = async (event) => {
+  event.preventDefault();
+  if (!isAdminUnlocked()) {
+    return;
+  }
+
+  const form = event.currentTarget;
+  setBusy(form, true);
+
+  try {
+    const payload = {
+      categoryId: pairCategorySelect?.value || selectedCategoryId || '',
+      name: normalizeText(pairName?.value || ''),
+      playerOneId: playerOneSelect?.value || '',
+      playerTwoId: playerTwoSelect?.value || '',
+    };
+
+    if (!(await mutate(async () => {
+      if (pairId?.value) {
+        await updatePair(pairId.value, payload);
+      } else {
+        await createPair(payload);
+      }
+    }))) {
+      return;
+    }
+
+    if (pairForm) {
+      pairForm.reset();
+      if (pairId) {
+        pairId.value = '';
+      }
+    }
+
+    await reloadState();
+    renderAll();
+  } finally {
+    setBusy(form, false);
+  }
+};
+
+const submitEventForm = async (event) => {
+  event.preventDefault();
+  if (!isAdminUnlocked()) {
+    return;
+  }
+
+  const form = event.currentTarget;
+  setBusy(form, true);
+
+  try {
+    const payload = {
+      name: normalizeText(eventNameInput?.value || ''),
+      date: eventDateInput?.value || '',
+      mode: eventModeInput?.value || '',
+      place: normalizeText(eventPlaceInput?.value || ''),
+      categoryName: normalizeText(eventCategoryNameInput?.value || ''),
+      maxPairs: eventMaxPairsInput?.value ? Number(eventMaxPairsInput.value) : null,
+    };
+
+    if (!(await mutate(() => createEvent(payload)))) {
+      return;
+    }
+    await reloadState();
+    renderAll();
+  } finally {
+    setBusy(form, false);
+  }
+};
+
+const submitCategoryForm = async (event) => {
+  event.preventDefault();
+  if (!isAdminUnlocked()) {
+    return;
+  }
+
+  const form = event.currentTarget;
+  setBusy(form, true);
+
+  try {
+    const currentEvent = appState.event;
+    if (!currentEvent?.id) {
+      throw new Error('Creá un evento antes de agregar categorías.');
+    }
+
+    const payload = {
+      name: normalizeText(categoryNameInput?.value || ''),
+      maxPairs: categoryMaxPairsInput?.value ? Number(categoryMaxPairsInput.value) : null,
+    };
+
+    if (!(await mutate(() => createCategory(currentEvent.id, payload)))) {
+      return;
+    }
+    await reloadState();
+    renderAll();
+  } finally {
+    setBusy(form, false);
+  }
+};
+
+const submitMatchForm = async (event) => {
+  const form = event.target.closest('form[data-match-form]');
+  if (!form) {
+    return;
+  }
+
+  event.preventDefault();
+  if (!isAdminUnlocked()) {
+    return;
+  }
+
+  const matchId = form.dataset.matchForm;
+  setBusy(form, true);
+
+  try {
+    const payload = {
+      date: form.querySelector('[name="date"]')?.value || '',
+      time: form.querySelector('[name="time"]')?.value || '',
+      venue: normalizeText(form.querySelector('[name="venue"]')?.value || ''),
+      setsA: form.querySelector('[name="setsA"]')?.value || null,
+      setsB: form.querySelector('[name="setsB"]')?.value || null,
+      gamesA: form.querySelector('[name="gamesA"]')?.value || null,
+      gamesB: form.querySelector('[name="gamesB"]')?.value || null,
+      winnerId: form.querySelector('[name="winnerId"]')?.value || null,
+    };
+
+    if (!(await mutate(() => updateMatch(matchId, payload)))) {
+      return;
+    }
+    await reloadState();
+    renderAll();
+  } finally {
+    setBusy(form, false);
+  }
+};
+
+const handleAdminLogin = async (event) => {
+  event.preventDefault();
+  setAdminLoginError('');
+
+  const username = normalizeText(adminUsername?.value || '');
+  const password = String(adminPassword?.value || '');
+
+  if (!username || !password) {
+    setAdminLoginError('Ingresá usuario y contraseña.');
+    return;
+  }
+
+  const form = event.currentTarget;
+  setBusy(form, true);
+
+  try {
+    await unlockAdmin(username, password);
+    if (adminPassword) {
+      adminPassword.value = '';
+    }
+    await reloadState();
+    renderAll();
+    setActiveTab('admin');
+  } catch (error) {
+    setAdminLoginError(error?.status === 401 ? 'Credenciales inválidas.' : error?.message || 'No se pudo iniciar sesión.');
+  } finally {
+    setBusy(form, false);
+  }
+};
+
+const handleAdminLogout = async () => {
+  await lockAdmin();
+  forceLockAdmin();
+  renderAll();
+  setActiveTab('admin');
+};
+
+const handleCategoryActions = async (event) => {
+  const button = event.target.closest('[data-category-id]');
+  if (!button) {
+    return;
+  }
+
+  setSelectedCategoryId(button.dataset.categoryId);
+};
+
+const handleHistoryActions = async (event) => {
+  const editPlayerButton = event.target.closest('[data-edit-player]');
+  if (editPlayerButton) {
+    const player = appState.players.find((item) => item.id === editPlayerButton.dataset.editPlayer);
+    if (!player) {
+      return;
+    }
+
+    if (playerId) {
+      playerId.value = player.id;
+    }
+    if (playerFirstName) {
+      playerFirstName.value = player.firstName || '';
+    }
+    if (playerLastName) {
+      playerLastName.value = player.lastName || '';
+    }
+    if (playerAlias) {
+      playerAlias.value = player.nickname || '';
+    }
+
+    setActiveTab('admin');
+    return;
+  }
+
+  const deletePlayerButton = event.target.closest('[data-delete-player]');
+  if (deletePlayerButton) {
+    const playerIdValue = deletePlayerButton.dataset.deletePlayer;
+    if (!playerIdValue) {
+      return;
+    }
+
+    if (!window.confirm('¿Borrar jugador?')) {
+      return;
+    }
+
+    if (!(await mutate(async () => {
+      await deletePlayer(playerIdValue);
+    }))) {
+      return;
+    }
+    await reloadState();
+    renderAll();
+    return;
+  }
+
+  const editPairButton = event.target.closest('[data-edit-pair]');
+  if (editPairButton) {
+    const pair = appState.pairs.find((item) => item.id === editPairButton.dataset.editPair);
+    if (!pair) {
+      return;
+    }
+
+    if (pairId) {
+      pairId.value = pair.id;
+    }
+    if (pairName) {
+      pairName.value = pair.name || '';
+    }
+    if (playerOneSelect) {
+      playerOneSelect.value = pair.playerOneId || '';
+    }
+    if (playerTwoSelect) {
+      playerTwoSelect.value = pair.playerTwoId || '';
+    }
+    if (pairCategorySelect) {
+      pairCategorySelect.value = pair.categoryId || selectedCategoryId || '';
+    }
+
+    setActiveTab('admin');
+    return;
+  }
+
+  const deletePairButton = event.target.closest('[data-delete-pair]');
+  if (deletePairButton) {
+    const pairIdValue = deletePairButton.dataset.deletePair;
+    if (!pairIdValue) {
+      return;
+    }
+
+    if (!window.confirm('¿Borrar pareja?')) {
+      return;
+    }
+
+    if (!(await mutate(async () => {
+      await deletePair(pairIdValue);
+    }))) {
+      return;
+    }
+    await reloadState();
+    renderAll();
+    return;
+  }
+};
+
+const handleCategorySelectChange = (event) => {
+  const value = event.target?.value || '';
+  if (value) {
+    setSelectedCategoryId(value);
+  }
+};
+
+const handleDeleteEvent = async () => {
+  if (!appState.event?.id) {
+    return;
+  }
+
+  if (!window.confirm('¿Eliminar el evento actual?')) {
+    return;
+  }
+
+  if (!(await mutate(async () => {
+    await deleteEvent(appState.event.id);
+  }))) {
+    return;
+  }
+  await reloadState();
+  renderAll();
+};
+
+const handlePlanCategory = async () => {
+  const category = getSelectedCategory();
+  if (!category) {
+    return;
+  }
+
+  if (!(await mutate(async () => {
+    await planCategory(category.id);
+  }))) {
+    return;
+  }
+  await reloadState();
+  renderAll();
+};
+
+const handleArchiveCategory = async () => {
+  const category = getSelectedCategory();
+  if (!category) {
+    return;
+  }
+
+  const winnerPairId = categoryWinnerSelect?.value || category.bracketChampion?.winnerId || category.standings?.[0]?.pairId || '';
+  if (!winnerPairId) {
+    setAppError('Elegí un ganador antes de archivar la categoría.');
+    return;
+  }
+
+  if (!(await mutate(async () => {
+    await archiveCategory(category.id, { winnerPairId });
+  }))) {
+    return;
+  }
+  await reloadState();
+  renderAll();
+};
+
+const handleLoadSamplePairs = async () => {
+  const category = getSelectedCategory();
+  if (!category) {
+    return;
+  }
+
+  const seedPlayers = [
+    { firstName: 'Barby', lastName: 'Ambar', nickname: '' },
+    { firstName: 'Dani', lastName: 'Maga', nickname: '' },
+    { firstName: 'Flor', lastName: 'Anto', nickname: '' },
+    { firstName: 'Juli', lastName: 'Lore', nickname: '' },
+  ];
+
+  if (!(await mutate(async () => {
+    const createdPlayers = [];
+
+    if (appState.players.length < seedPlayers.length) {
+      for (const player of seedPlayers) {
+        const createdPlayer = await createPlayer(player);
+        createdPlayers.push(createdPlayer);
+      }
+    }
+
+    const currentPlayers = [...appState.players, ...createdPlayers];
+    const playerIds = currentPlayers.map((player) => player.id);
+    const candidates = [
+      [playerIds[0], playerIds[1]],
+      [playerIds[2], playerIds[3]],
+    ].filter((pair) => pair.every(Boolean));
+
+      for (const [left, right] of candidates) {
+        await createPair({
+          categoryId: category.id,
+          playerOneId: left,
+          playerTwoId: right,
+        });
+      }
+  }))) {
+    return;
+  }
+
+  await reloadState();
+  renderAll();
+};
+
+const handleClearPairs = async () => {
+  const category = getSelectedCategory();
+  if (!category) {
+    return;
+  }
+
+  if (!window.confirm('¿Vaciar parejas de la categoría?')) {
+    return;
+  }
+
+  if (!(await mutate(async () => {
+    for (const pair of category.pairs || []) {
+      await deletePair(pair.id);
+    }
+  }))) {
+    return;
+  }
+
+  await reloadState();
+  renderAll();
+};
+
+const openPlayersModalHandler = () => {
+  if (!playersModal) {
+    return;
+  }
+
+  playersModal.hidden = false;
+  playersModal.classList.remove('is-hidden');
+  playersModal.setAttribute('aria-hidden', 'false');
+};
+
+const closePlayersModalHandler = () => {
+  if (!playersModal) {
+    return;
+  }
+
+  playersModal.hidden = true;
+  playersModal.classList.add('is-hidden');
+  playersModal.setAttribute('aria-hidden', 'true');
+};
+
+const handleTabClick = (event) => {
+  const button = event.target.closest('[data-tab]');
+  if (!button) {
+    return;
+  }
+
+  setActiveTab(button.dataset.tab);
+};
+
+const handleThemeClick = () => {
+  toggleTheme();
+};
+
+const attachListeners = () => {
+  document.addEventListener('click', handleTabClick);
+  categoryRail?.addEventListener('click', handleCategoryActions);
+  overviewList?.addEventListener('click', handleCategoryActions);
+  document.addEventListener('click', handleHistoryActions);
+  matchEditorList?.addEventListener('submit', submitMatchForm);
+  adminLoginForm?.addEventListener('submit', handleAdminLogin);
+  adminLogout?.addEventListener('click', handleAdminLogout);
+  eventForm?.addEventListener('submit', submitEventForm);
+  categoryForm?.addEventListener('submit', submitCategoryForm);
+  playerForm?.addEventListener('submit', submitPlayerForm);
+  pairForm?.addEventListener('submit', submitPairForm);
+  deleteEventButton?.addEventListener('click', handleDeleteEvent);
+  planCategoryButton?.addEventListener('click', handlePlanCategory);
+  archiveCategoryButton?.addEventListener('click', handleArchiveCategory);
+  loadSamplePairsButton?.addEventListener('click', handleLoadSamplePairs);
+  clearPairsButton?.addEventListener('click', handleClearPairs);
+  openPlayersModal?.addEventListener('click', openPlayersModalHandler);
+  openPairsTab?.addEventListener('click', () => setActiveTab('mas'));
+  closePlayersModal?.addEventListener('click', closePlayersModalHandler);
+  playersModal?.addEventListener('click', (event) => {
+    if (event.target?.matches?.('[data-modal-close]')) {
+      closePlayersModalHandler();
+    }
+  });
+  themeToggle?.addEventListener('click', handleThemeClick);
+  themeToggleMobile?.addEventListener('click', handleThemeClick);
+  categorySelect?.addEventListener('change', handleCategorySelectChange);
+  adminCategorySelect?.addEventListener('change', handleCategorySelectChange);
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closePlayersModalHandler();
+    }
+  });
+};
+
+const init = async () => {
+  setTheme(themeMode || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+  attachListeners();
+
+  try {
+    await syncAdminSession();
+  } catch (error) {
+    if (error?.status !== 401) {
+      setAppError(error?.message || 'No se pudo validar la sesión de admin.');
+    }
+    forceLockAdmin();
+  }
+
+  try {
+    await reloadState();
+  } catch (error) {
+    setAppError(error?.message || 'No se pudo cargar el estado inicial.');
+  }
+
+  renderAll();
+  setActiveTab(activeTab);
+};
+
+init().catch((error) => {
+  console.error(error);
+  setAppError(error?.message || 'No se pudo iniciar la aplicación.');
+  renderAll();
+});
