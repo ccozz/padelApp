@@ -105,19 +105,28 @@
           <section class="panel" id="tab-mas">
             <div class="section-head">
               <h2>Más</h2>
-              <p>Reglas, parejas, historial y waitlist.</p>
+              <p>Reglas y guía rápida para registrarse y anotarse.</p>
             </div>
             <section class="card block-card">
               <span class="card-label">Reglas</span>
               <ul id="rulesList" class="rules-list"></ul>
             </section>
             <section class="card block-card">
-              <span class="card-label">Parejas</span>
-              <div id="pairsList" class="pairs-list"></div>
-            </section>
-            <section class="card block-card">
-              <span class="card-label">Historial</span>
-              <div id="historyRoot" class="history-root"></div>
+              <span class="card-label">Cómo registrarse</span>
+              <div class="stack-list">
+                <article class="card">
+                  <h3>1. Crear cuenta</h3>
+                  <p>Registrate con tu email y contraseña para activar tu perfil de jugador.</p>
+                </article>
+                <article class="card">
+                  <h3>2. Verificar email</h3>
+                  <p>Revisá tu correo y confirmá la cuenta con el enlace recibido.</p>
+                </article>
+                <article class="card">
+                  <h3>3. Anotarte</h3>
+                  <p>Elegí una categoría y anotate con un compañero cuando haya cupo disponible.</p>
+                </article>
+              </div>
             </section>
           </section>
 
@@ -261,6 +270,12 @@
                 </section>
 
                 <section class="card block-card">
+                  <span class="card-label">Parejas y espera</span>
+                  <h3>Listado actual</h3>
+                  <div id="pairsList" class="pairs-list"></div>
+                </section>
+
+                <section class="card block-card">
                   <span class="card-label">Cierre</span>
                   <h3>Planificar o archivar</h3>
                   <label class="inline-select">
@@ -285,6 +300,12 @@
                   <span class="card-label">Partidos</span>
                   <h3>Editar fixture</h3>
                   <div id="matchEditorList" class="stack-list"></div>
+                </section>
+
+                <section class="card block-card">
+                  <span class="card-label">Historial</span>
+                  <h3>Archivados</h3>
+                  <div id="historyRoot" class="history-root"></div>
                 </section>
               </div>
             </section>

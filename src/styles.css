@@ -673,7 +673,7 @@ button:active,
   display: none !important;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .app-shell {
     grid-template-columns: minmax(16rem, 18rem) minmax(0, 1fr);
     align-items: start;
@@ -702,36 +702,14 @@ button:active,
   }
 
   .bottom-nav {
-    width: auto;
-    right: 1rem;
-    left: auto;
-    bottom: 1rem;
-    transform: none;
+    display: none;
   }
 
   .admin-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .pairs-list,
-  .players-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .grid-two {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 1024px) {
-  .admin-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .pairs-list {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .players-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
