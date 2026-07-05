@@ -132,6 +132,92 @@ const setAdminLoginError = (message = '') => {
   adminLoginError.textContent = message;
 };
 
+const formErrorMap = new Map();
+
+const ensureFormErrorNode = (form, key) => {
+  if (!form) {
+    return null;
+  }
+
+  if (formErrorMap.has(key)) {
+    const existingNode = formErrorMap.get(key);
+    if (existingNode?.isConnected) {
+      return existingNode;
+    }
+    formErrorMap.delete(key);
+  }
+
+  const node = document.createElement('div');
+  node.dataset.formError = key;
+  node.setAttribute('role', 'alert');
+  node.style.marginTop = '0.75rem';
+  node.style.padding = '0.75rem 1rem';
+  node.style.border = '2px solid var(--color-danger)';
+  node.style.borderRadius = '0.9rem';
+  node.style.background = 'color-mix(in srgb, var(--color-danger) 16%, var(--color-surface))';
+  node.style.color = 'var(--color-text-primary)';
+  node.style.fontWeight = '600';
+  node.hidden = true;
+
+  form.insertAdjacentElement('afterend', node);
+  formErrorMap.set(key, node);
+  return node;
+};
+
+const setFormError = (form, key, message = '') => {
+  const node = ensureFormErrorNode(form, key);
+  if (!node) {
+    return;
+  }
+
+  if (!message) {
+    node.hidden = true;
+    node.textContent = '';
+    return;
+  }
+
+  node.hidden = false;
+  node.textContent = message;
+};
+
+const clearFormError = (form, key) => setFormError(form, key, '');
+
+const buildPlayerOptionMarkup = (player, selectedId, excludedId = '') => {
+  if (!player || player.id === excludedId) {
+    return '';
+  }
+
+  return `<option value="${escapeHtml(player.id)}" ${player.id === selectedId ? 'selected' : ''}>${escapeHtml(getPlayerLabel(player))}</option>`;
+};
+
+const syncPairPlayerSelects = (changedSelect) => {
+  if (!playerOneSelect || !playerTwoSelect) {
+    return;
+  }
+
+  const selectedOne = playerOneSelect.value || '';
+  const selectedTwo = playerTwoSelect.value || '';
+
+  if (changedSelect === playerOneSelect && selectedOne && selectedOne === selectedTwo) {
+    playerTwoSelect.value = '';
+  }
+
+  if (changedSelect === playerTwoSelect && selectedTwo && selectedTwo === selectedOne) {
+    playerOneSelect.value = '';
+  }
+
+  const nextSelectedOne = playerOneSelect.value || '';
+  const nextSelectedTwo = playerTwoSelect.value || '';
+  const players = appState.players || [];
+
+  playerOneSelect.innerHTML = players
+    .map((player) => buildPlayerOptionMarkup(player, nextSelectedOne, nextSelectedTwo))
+    .join('');
+  playerTwoSelect.innerHTML = players
+    .map((player) => buildPlayerOptionMarkup(player, nextSelectedTwo, nextSelectedOne))
+    .join('');
+};
+
 const setBusy = (container, busy) => {
   if (!container) {
     return;
@@ -960,6 +1046,8 @@ const renderAdminState = () => {
   if (activeCategory && pairCategorySelect) {
     pairCategorySelect.value = activeCategory.id;
   }
+
+  syncPairPlayerSelects();
 };
 
 const renderMatchEditor = () => {
@@ -1091,6 +1179,7 @@ const submitPlayerForm = async (event) => {
   }
 
   const form = event.currentTarget;
+  clearFormError(form, 'player-form');
   setBusy(form, true);
 
   try {
@@ -1100,15 +1189,13 @@ const submitPlayerForm = async (event) => {
       nickname: normalizeText(playerAlias?.value || ''),
     };
 
-    if (!(await mutate(async () => {
+    await runAction(async () => {
       if (playerId?.value) {
         await updatePlayer(playerId.value, payload);
       } else {
         await createPlayer(payload);
       }
-    }))) {
-      return;
-    }
+    });
 
     if (playerForm) {
       playerForm.reset();
@@ -1118,6 +1205,8 @@ const submitPlayerForm = async (event) => {
     }
     await reloadState();
     renderAll();
+  } catch (error) {
+    setFormError(form, 'player-form', error?.message || 'No se pudo guardar el jugador.');
   } finally {
     setBusy(form, false);
   }
@@ -1130,6 +1219,7 @@ const submitPairForm = async (event) => {
   }
 
   const form = event.currentTarget;
+  clearFormError(form, 'pair-form');
   setBusy(form, true);
 
   try {
@@ -1140,15 +1230,13 @@ const submitPairForm = async (event) => {
       playerTwoId: playerTwoSelect?.value || '',
     };
 
-    if (!(await mutate(async () => {
+    await runAction(async () => {
       if (pairId?.value) {
         await updatePair(pairId.value, payload);
       } else {
         await createPair(payload);
       }
-    }))) {
-      return;
-    }
+    });
 
     if (pairForm) {
       pairForm.reset();
@@ -1159,6 +1247,8 @@ const submitPairForm = async (event) => {
 
     await reloadState();
     renderAll();
+  } catch (error) {
+    setFormError(form, 'pair-form', error?.message || 'No se pudo guardar la pareja.');
   } finally {
     setBusy(form, false);
   }
@@ -1171,6 +1261,7 @@ const submitEventForm = async (event) => {
   }
 
   const form = event.currentTarget;
+  clearFormError(form, 'event-form');
   setBusy(form, true);
 
   try {
@@ -1183,11 +1274,11 @@ const submitEventForm = async (event) => {
       maxPairs: eventMaxPairsInput?.value ? Number(eventMaxPairsInput.value) : null,
     };
 
-    if (!(await mutate(() => createEvent(payload)))) {
-      return;
-    }
+    await runAction(() => createEvent(payload));
     await reloadState();
     renderAll();
+  } catch (error) {
+    setFormError(form, 'event-form', error?.message || 'No se pudo crear el evento.');
   } finally {
     setBusy(form, false);
   }
@@ -1200,6 +1291,7 @@ const submitCategoryForm = async (event) => {
   }
 
   const form = event.currentTarget;
+  clearFormError(form, 'category-form');
   setBusy(form, true);
 
   try {
@@ -1213,11 +1305,11 @@ const submitCategoryForm = async (event) => {
       maxPairs: categoryMaxPairsInput?.value ? Number(categoryMaxPairsInput.value) : null,
     };
 
-    if (!(await mutate(() => createCategory(currentEvent.id, payload)))) {
-      return;
-    }
+    await runAction(() => createCategory(currentEvent.id, payload));
     await reloadState();
     renderAll();
+  } catch (error) {
+    setFormError(form, 'category-form', error?.message || 'No se pudo crear la categoría.');
   } finally {
     setBusy(form, false);
   }
@@ -1235,6 +1327,7 @@ const submitMatchForm = async (event) => {
   }
 
   const matchId = form.dataset.matchForm;
+  clearFormError(form, `match-form-${matchId}`);
   setBusy(form, true);
 
   try {
@@ -1249,11 +1342,11 @@ const submitMatchForm = async (event) => {
       winnerId: form.querySelector('[name="winnerId"]')?.value || null,
     };
 
-    if (!(await mutate(() => updateMatch(matchId, payload)))) {
-      return;
-    }
+    await runAction(() => updateMatch(matchId, payload));
     await reloadState();
     renderAll();
+  } catch (error) {
+    setFormError(form, `match-form-${matchId}`, error?.message || 'No se pudo guardar el partido.');
   } finally {
     setBusy(form, false);
   }
@@ -1590,6 +1683,8 @@ const attachListeners = () => {
   themeToggleMobile?.addEventListener('click', handleThemeClick);
   categorySelect?.addEventListener('change', handleCategorySelectChange);
   adminCategorySelect?.addEventListener('change', handleCategorySelectChange);
+  playerOneSelect?.addEventListener('change', () => syncPairPlayerSelects(playerOneSelect));
+  playerTwoSelect?.addEventListener('change', () => syncPairPlayerSelects(playerTwoSelect));
   window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
       closePlayersModalHandler();
