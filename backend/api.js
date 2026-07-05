@@ -881,6 +881,8 @@ export const createApiRouter = (db) => {
       return jsonError(res, 400, 'First name and last name are required');
     }
 
+    // Deuda técnica: hoy el backend permite jugadores con first_name + last_name duplicados.
+    // Se deja así hasta definir una regla de identidad estable para nombres repetidos.
     const id = randomUUID();
     db.prepare(
       `
@@ -1439,6 +1441,8 @@ export const createApiRouter = (db) => {
     const groupCount = getGroupCount(pairs.length);
     const groups = buildBalancedGroups(pairs, groupCount);
     const fixtures = buildBalancedCrossGroupFixtures(pairs, groups);
+    const groupIdMap = new Map(groups.map((group) => [group.id, randomUUID()]));
+    const matchIdMap = new Map(fixtures.map((match) => [match.id, randomUUID()]));
 
     db.exec('BEGIN IMMEDIATE');
 
@@ -1471,13 +1475,15 @@ export const createApiRouter = (db) => {
       );
 
       groups.forEach((group) => {
-        insertGroup.run(group.id, category.id, group.name);
-        group.pairIds.forEach((pairId) => insertGroupPair.run(group.id, pairId));
+        const databaseGroupId = groupIdMap.get(group.id) || randomUUID();
+        insertGroup.run(databaseGroupId, category.id, group.name);
+        group.pairIds.forEach((pairId) => insertGroupPair.run(databaseGroupId, pairId));
       });
 
       fixtures.forEach((match) => {
+        const databaseMatchId = matchIdMap.get(match.id) || randomUUID();
         insertMatch.run(
-          match.id,
+          databaseMatchId,
           category.id,
           match.stage,
           match.pairAId,
