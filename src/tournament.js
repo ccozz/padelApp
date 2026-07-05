@@ -32,7 +32,7 @@ export const buildBalancedCrossGroupFixtures = (pairs, groups, targetMatches = 2
   const orderedPairs = [...pairs].sort((left, right) => {
     const stateLeft = pairState.get(left.id);
     const stateRight = pairState.get(right.id);
-    return stateRight.remaining - stateLeft.remaining || left.name.localeCompare(right.name);
+    return stateRight.remaining - stateLeft.remaining || (left.name || '').localeCompare(right.name || '');
   });
 
   const getGroupIdForPair = (pairId) =>
@@ -82,7 +82,7 @@ export const buildBalancedCrossGroupFixtures = (pairs, groups, targetMatches = 2
       .sort((left, right) => {
         const leftState = pairState.get(left.id);
         const rightState = pairState.get(right.id);
-        return rightState.remaining - leftState.remaining || left.name.localeCompare(right.name);
+        return rightState.remaining - leftState.remaining || (left.name || '').localeCompare(right.name || '');
       });
 
     for (const candidate of candidates) {
@@ -198,7 +198,7 @@ export const buildStandings = (pairs, matches) => {
       headToHead ||
       rightSetDiff - leftSetDiff ||
       rightGameDiff - leftGameDiff ||
-      left.name.localeCompare(right.name)
+      (left.name || '').localeCompare(right.name || '')
     );
   });
 };
