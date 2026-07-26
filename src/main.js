@@ -182,12 +182,46 @@ const setFormError = (form, key, message = '') => {
 
 const clearFormError = (form, key) => setFormError(form, key, '');
 
-const buildPlayerOptionMarkup = (player, selectedId, excludedId = '') => {
+const buildPlayerOptionMarkup = (player, selectedId, excludedId = '', unavailablePlayerIds = new Set()) => {
   if (!player || player.id === excludedId) {
     return '';
   }
 
+  if (unavailablePlayerIds.has(player.id) && player.id !== selectedId) {
+    return '';
+  }
+
   return `<option value="${escapeHtml(player.id)}" ${player.id === selectedId ? 'selected' : ''}>${escapeHtml(getPlayerLabel(player))}</option>`;
+};
+
+const getPairFormCategory = () => {
+  const categoryId = pairCategorySelect?.value || selectedCategoryId || appState.selectedCategory?.id || '';
+
+  return appState.categories.find((category) => category.id === categoryId) || appState.selectedCategory || appState.categories[0] || null;
+};
+
+const getPairFormEditingPairId = () => pairId?.value || '';
+
+const getPairFormUnavailablePlayerIds = () => {
+  const category = getPairFormCategory();
+  const editingPairId = getPairFormEditingPairId();
+  const unavailablePlayerIds = new Set();
+
+  (category?.pairs || []).forEach((pair) => {
+    if (!pair || pair.id === editingPairId) {
+      return;
+    }
+
+    if (pair.playerOneId) {
+      unavailablePlayerIds.add(pair.playerOneId);
+    }
+
+    if (pair.playerTwoId) {
+      unavailablePlayerIds.add(pair.playerTwoId);
+    }
+  });
+
+  return unavailablePlayerIds;
 };
 
 const syncPairPlayerSelects = (changedSelect) => {
@@ -209,13 +243,22 @@ const syncPairPlayerSelects = (changedSelect) => {
   const nextSelectedOne = playerOneSelect.value || '';
   const nextSelectedTwo = playerTwoSelect.value || '';
   const players = appState.players || [];
+  const unavailablePlayerIds = getPairFormUnavailablePlayerIds();
 
   playerOneSelect.innerHTML = players
-    .map((player) => buildPlayerOptionMarkup(player, nextSelectedOne, nextSelectedTwo))
+    .map((player) => buildPlayerOptionMarkup(player, nextSelectedOne, nextSelectedTwo, unavailablePlayerIds))
     .join('');
   playerTwoSelect.innerHTML = players
-    .map((player) => buildPlayerOptionMarkup(player, nextSelectedTwo, nextSelectedOne))
+    .map((player) => buildPlayerOptionMarkup(player, nextSelectedTwo, nextSelectedOne, unavailablePlayerIds))
     .join('');
+
+  if (![...playerOneSelect.options].some((option) => option.value === nextSelectedOne)) {
+    playerOneSelect.value = '';
+  }
+
+  if (![...playerTwoSelect.options].some((option) => option.value === nextSelectedTwo)) {
+    playerTwoSelect.value = '';
+  }
 };
 
 const setBusy = (container, busy) => {
@@ -1019,9 +1062,8 @@ const renderAdminState = () => {
 
   if (pairCategorySelect) {
     pairCategorySelect.innerHTML = categoryOptions || '<option value="">Sin categorías</option>';
-    if (selectedCategoryId) {
-      pairCategorySelect.value = selectedCategoryId;
-    }
+    const editingPair = pairId?.value ? appState.pairs.find((pair) => pair.id === pairId.value) : null;
+    pairCategorySelect.value = editingPair?.categoryId || selectedCategoryId || '';
   }
 
   if (categoryWinnerSelect) {
@@ -1466,6 +1508,7 @@ const handleHistoryActions = async (event) => {
     if (pairCategorySelect) {
       pairCategorySelect.value = pair.categoryId || selectedCategoryId || '';
     }
+    syncPairPlayerSelects();
 
     setActiveTab('admin');
     return;
@@ -1683,6 +1726,7 @@ const attachListeners = () => {
   themeToggleMobile?.addEventListener('click', handleThemeClick);
   categorySelect?.addEventListener('change', handleCategorySelectChange);
   adminCategorySelect?.addEventListener('change', handleCategorySelectChange);
+  pairCategorySelect?.addEventListener('change', () => syncPairPlayerSelects());
   playerOneSelect?.addEventListener('change', () => syncPairPlayerSelects(playerOneSelect));
   playerTwoSelect?.addEventListener('change', () => syncPairPlayerSelects(playerTwoSelect));
   window.addEventListener('keydown', (event) => {

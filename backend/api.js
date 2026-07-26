@@ -105,6 +105,12 @@ const buildPlayerPublicRecord = (player) => ({
   account_status: player.account_status,
 });
 
+const getPlayerDisplayName = (player) =>
+  normalizeText(player?.nickname) ||
+  normalizeText(player?.full_name) ||
+  normalizeText([player?.first_name, player?.last_name].filter(Boolean).join(' ')) ||
+  'Jugador';
+
 const toIsoNow = () => new Date().toISOString();
 
 const getEventById = (db, eventId) => db.prepare('SELECT * FROM tournaments WHERE id = ?').get(eventId);
@@ -195,6 +201,26 @@ const getPairByPlayerInCategory = (db, categoryId, playerId) =>
       `,
     )
     .get(categoryId, playerId, playerId);
+
+const getOtherPairByPlayerInCategory = (db, categoryId, playerId, excludedPairId = null) => {
+  const query = excludedPairId
+    ? `
+        SELECT *
+        FROM pairs
+        WHERE category_id = ? AND id != ? AND (player_one_id = ? OR player_two_id = ?)
+        LIMIT 1
+      `
+    : `
+        SELECT *
+        FROM pairs
+        WHERE category_id = ? AND (player_one_id = ? OR player_two_id = ?)
+        LIMIT 1
+      `;
+
+  return excludedPairId
+    ? db.prepare(query).get(categoryId, excludedPairId, playerId, playerId)
+    : db.prepare(query).get(categoryId, playerId, playerId);
+};
 
 const getPendingWaitlistEntry = (db, categoryId) =>
   db
@@ -1184,6 +1210,16 @@ export const createApiRouter = (db) => {
       return jsonError(res, 400, 'Both players must exist');
     }
 
+    const duplicatePlayerOnePair = getOtherPairByPlayerInCategory(db, categoryId, playerOneId);
+    if (duplicatePlayerOnePair) {
+      return jsonError(res, 400, `El jugador ${getPlayerDisplayName(playerOne)} ya tiene pareja en esta categoría`);
+    }
+
+    const duplicatePlayerTwoPair = getOtherPairByPlayerInCategory(db, categoryId, playerTwoId);
+    if (duplicatePlayerTwoPair) {
+      return jsonError(res, 400, `El jugador ${getPlayerDisplayName(playerTwo)} ya tiene pareja en esta categoría`);
+    }
+
     const pairId = randomUUID();
     const pairName = name || buildPairNameFromPlayers(playerOne, playerTwo);
 
@@ -1223,6 +1259,16 @@ export const createApiRouter = (db) => {
     const playerTwo = getPlayerById(db, playerTwoId);
     if (!playerOne || !playerTwo) {
       return jsonError(res, 400, 'Both players must exist');
+    }
+
+    const duplicatePlayerOnePair = getOtherPairByPlayerInCategory(db, categoryId, playerOneId, req.params.id);
+    if (duplicatePlayerOnePair) {
+      return jsonError(res, 400, `El jugador ${getPlayerDisplayName(playerOne)} ya tiene pareja en esta categoría`);
+    }
+
+    const duplicatePlayerTwoPair = getOtherPairByPlayerInCategory(db, categoryId, playerTwoId, req.params.id);
+    if (duplicatePlayerTwoPair) {
+      return jsonError(res, 400, `El jugador ${getPlayerDisplayName(playerTwo)} ya tiene pareja en esta categoría`);
     }
 
     db.prepare(
