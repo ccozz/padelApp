@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import express from 'express';
 import {
-  buildBalancedCrossGroupFixtures,
   buildBalancedGroups,
   buildKnockoutBracket,
   buildStandings,
   resolveBracketWinner,
+  buildGroupFixtures,
 } from '../lib/tournament.js';
 import { COOKIE_NAME, PLAYER_COOKIE_NAME, requireAdmin, requirePlayerAuth, signPlayerSessionToken, signSessionToken, verifyPassword, hashPassword } from './auth.js';
 import { sendPasswordResetEmail, sendVerificationEmail } from './email.js';
@@ -1443,7 +1443,7 @@ export const createApiRouter = (db) => {
 
     const groupCount = getGroupCount(pairs.length);
     const groups = buildBalancedGroups(pairs, groupCount);
-    const fixtures = buildBalancedCrossGroupFixtures(pairs, groups);
+    const fixtures = buildGroupFixtures(pairs, groups);
     const groupIdMap = new Map(groups.map((group) => [group.id, randomUUID()]));
     const matchIdMap = new Map(fixtures.map((match) => [match.id, randomUUID()]));
 
