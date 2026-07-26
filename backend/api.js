@@ -116,6 +116,28 @@ const toIsoNow = () => new Date().toISOString();
 const getEventById = (db, eventId) => db.prepare('SELECT * FROM tournaments WHERE id = ?').get(eventId);
 const getCategoryById = (db, categoryId) => db.prepare('SELECT * FROM categories WHERE id = ?').get(categoryId);
 const getPlayerById = (db, playerId) => db.prepare('SELECT * FROM players WHERE id = ?').get(playerId);
+const getPlayerByName = (db, firstName, lastName, excludedPlayerId = null) => {
+  const query = excludedPlayerId
+    ? `
+        SELECT *
+        FROM players
+        WHERE LOWER(TRIM(first_name)) = LOWER(TRIM(?))
+          AND LOWER(TRIM(last_name)) = LOWER(TRIM(?))
+          AND id != ?
+        LIMIT 1
+      `
+    : `
+        SELECT *
+        FROM players
+        WHERE LOWER(TRIM(first_name)) = LOWER(TRIM(?))
+          AND LOWER(TRIM(last_name)) = LOWER(TRIM(?))
+        LIMIT 1
+      `;
+
+  return excludedPlayerId
+    ? db.prepare(query).get(firstName, lastName, excludedPlayerId)
+    : db.prepare(query).get(firstName, lastName);
+};
 const getPairById = (db, pairId) => db.prepare('SELECT * FROM pairs WHERE id = ?').get(pairId);
 
 const buildDecoratedPairFromRow = (db, pairRow) => {
@@ -910,8 +932,11 @@ export const createApiRouter = (db) => {
       return jsonError(res, 400, 'First name and last name are required');
     }
 
-    // Deuda técnica: hoy el backend permite jugadores con first_name + last_name duplicados.
-    // Se deja así hasta definir una regla de identidad estable para nombres repetidos.
+    const duplicatePlayer = getPlayerByName(db, firstName, lastName);
+    if (duplicatePlayer) {
+      return jsonError(res, 400, `Ya existe un jugador registrado como ${firstName} ${lastName}`);
+    }
+
     const id = randomUUID();
     db.prepare(
       `
@@ -933,6 +958,11 @@ export const createApiRouter = (db) => {
     const lastName = normalizeText(req.body?.lastName ?? req.body?.last_name ?? current.last_name);
     const nickname = normalizeText(req.body?.nickname ?? current.nickname);
     const fullName = normalizeText(req.body?.fullName ?? req.body?.full_name) || [firstName, lastName].filter(Boolean).join(' ');
+
+    const duplicatePlayer = getPlayerByName(db, firstName, lastName, req.params.id);
+    if (duplicatePlayer) {
+      return jsonError(res, 400, `Ya existe un jugador registrado como ${firstName} ${lastName}`);
+    }
 
     db.prepare(
       `
