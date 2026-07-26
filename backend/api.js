@@ -363,7 +363,7 @@ const buildCategoryBundle = (db, categoryRow, players = null, includePlayers = t
   const groupPairs = getGroupPairs(db, groupRows.map((group) => group.id));
   const matches = getMatchesByCategory(db, categoryRow.id).map((match) => decorateMatch(match, pairMap));
   const standings = buildStandings(pairs, matches);
-  const bracket = buildKnockoutBracket(standings, pairs, 8);
+  const bracket = buildKnockoutBracket(standings, pairs, groups);
   const bracketResults = matches
     .filter((match) => match.stage !== 'groups' && match.played)
     .map((match) => ({
