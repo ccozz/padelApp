@@ -17,166 +17,169 @@ export const buildBalancedGroups = (pairs, groupCount) => {
 };
 
 export const buildBalancedCrossGroupFixtures = (pairs, groups, targetMatches = 2) => {
-  const normalizeTarget = (value) => Math.max(1, Number.isFinite(value) ? Math.floor(value) : 1);
-  const initialTarget = normalizeTarget(targetMatches);
-  const attemptTargets = [initialTarget];
+  const baseTarget = Math.max(1, Number.isFinite(targetMatches) ? Math.floor(targetMatches) : 1);
+  const pairById = new Map(pairs.map((pair) => [pair.id, pair]));
+  const groupByPairId = new Map();
 
-  for (let nextTarget = initialTarget - 1; nextTarget >= 1; nextTarget -= 1) {
-    attemptTargets.push(nextTarget);
-  }
-
-  const buildForTarget = (currentTarget) => {
-    const pairById = new Map(pairs.map((pair) => [pair.id, pair]));
-    const pairState = new Map(
-      pairs.map((pair) => [
-        pair.id,
-        {
-          remaining: currentTarget,
-          opponents: new Set(),
-        },
-      ]),
-    );
-    const orderedPairs = [...pairs].sort((left, right) => {
-      const stateLeft = pairState.get(left.id);
-      const stateRight = pairState.get(right.id);
-      return stateRight.remaining - stateLeft.remaining || (left.name || '').localeCompare(right.name || '');
+  groups.forEach((group) => {
+    group.pairIds.forEach((pairId) => {
+      groupByPairId.set(pairId, group.id);
     });
-    const matches = [];
+  });
 
-    const getGroupIdForPair = (pairId) => groups.find((group) => group.pairIds.includes(pairId))?.id || null;
+  const pairLabel = (pair) => pairById.get(pair.id)?.name || getPairLabel(pair);
 
-    const canPair = (pairAId, pairBId) => {
-      if (pairAId === pairBId) {
-        return false;
-      }
+  const createNode = (pair, groupId, need) => ({
+    pair,
+    groupId,
+    need,
+    label: pairLabel(pair),
+    opponents: new Set(),
+  });
 
-      const pairAState = pairState.get(pairAId);
-      const pairBState = pairState.get(pairBId);
-      if (!pairAState || !pairBState) {
-        return false;
-      }
+  const addFixture = (matches, currentNode, candidateNode) => {
+    const matchIndex = matches.length + 1;
+    matches.push({
+      id: createMatchId(currentNode.pair.id, candidateNode.pair.id, matchIndex),
+      stage: 'groups',
+      pairAId: currentNode.pair.id,
+      pairBId: candidateNode.pair.id,
+      pairALabel: currentNode.label,
+      pairBLabel: candidateNode.label,
+      date: '',
+      time: '',
+      venue: '',
+      scoreA: null,
+      scoreB: null,
+      setsA: null,
+      setsB: null,
+      gamesA: null,
+      gamesB: null,
+      played: false,
+    });
 
-      if (pairAState.remaining <= 0 || pairBState.remaining <= 0) {
-        return false;
-      }
+    currentNode.opponents.add(candidateNode.pair.id);
+    candidateNode.opponents.add(currentNode.pair.id);
 
-      if (pairAState.opponents.has(pairBId) || pairBState.opponents.has(pairAId)) {
-        return false;
-      }
+    if (currentNode.need > 0) {
+      currentNode.need -= 1;
+    }
 
-      const pairAGroupId = getGroupIdForPair(pairAId);
-      const pairBGroupId = getGroupIdForPair(pairBId);
-      return Boolean(pairAGroupId && pairBGroupId && pairAGroupId !== pairBGroupId);
-    };
-
-    const candidateCount = (pairId) =>
-      orderedPairs.reduce((count, candidate) => count + (canPair(pairId, candidate.id) ? 1 : 0), 0);
-
-    const pickNextPair = () => {
-      const availablePairs = orderedPairs.filter((pair) => pairState.get(pair.id)?.remaining > 0);
-      if (!availablePairs.length) {
-        return null;
-      }
-
-      return availablePairs
-        .map((pair) => ({
-          pair,
-          candidates: candidateCount(pair.id),
-        }))
-        .sort((left, right) => {
-          const leftState = pairState.get(left.pair.id);
-          const rightState = pairState.get(right.pair.id);
-          return (
-            left.candidates - right.candidates ||
-            rightState.remaining - leftState.remaining ||
-            (left.pair.name || '').localeCompare(right.pair.name || '')
-          );
-        })[0].pair;
-    };
-
-    const cloneMatches = () => matches.map((match) => ({ ...match }));
-
-    const placeMatches = () => {
-      const currentPair = pickNextPair();
-      if (!currentPair) {
-        return cloneMatches();
-      }
-
-      const currentState = pairState.get(currentPair.id);
-      const candidates = orderedPairs
-        .filter((candidate) => canPair(currentPair.id, candidate.id))
-        .sort((left, right) => {
-          const leftState = pairState.get(left.id);
-          const rightState = pairState.get(right.id);
-          return rightState.remaining - leftState.remaining || (left.name || '').localeCompare(right.name || '');
-        });
-
-      let bestResult = cloneMatches();
-
-      const skippedRemaining = currentState.remaining;
-      currentState.remaining = 0;
-      const skipResult = placeMatches();
-      if (skipResult.length > bestResult.length) {
-        bestResult = skipResult;
-      }
-      currentState.remaining = skippedRemaining;
-
-      for (const candidate of candidates) {
-        const candidateState = pairState.get(candidate.id);
-        const matchIndex = matches.length + 1;
-
-        matches.push({
-          id: createMatchId(currentPair.id, candidate.id, matchIndex),
-          stage: 'groups',
-          pairAId: currentPair.id,
-          pairBId: candidate.id,
-          pairALabel: pairById.get(currentPair.id)?.name || getPairLabel(currentPair),
-          pairBLabel: pairById.get(candidate.id)?.name || getPairLabel(candidate),
-          date: '',
-          time: '',
-          venue: '',
-          scoreA: null,
-          scoreB: null,
-          setsA: null,
-          setsB: null,
-          gamesA: null,
-          gamesB: null,
-          played: false,
-        });
-
-        currentState.remaining -= 1;
-        candidateState.remaining -= 1;
-        currentState.opponents.add(candidate.id);
-        candidateState.opponents.add(currentPair.id);
-
-        const branchResult = placeMatches();
-        if (branchResult.length > bestResult.length) {
-          bestResult = branchResult;
-        }
-
-        currentState.opponents.delete(candidate.id);
-        candidateState.opponents.delete(currentPair.id);
-        currentState.remaining += 1;
-        candidateState.remaining += 1;
-        matches.pop();
-      }
-
-      return bestResult;
-    };
-
-    return placeMatches();
+    if (candidateNode.need > 0) {
+      candidateNode.need -= 1;
+    }
   };
 
-  let bestMatches = [];
+  const candidateCount = (node, nodes) =>
+    nodes.reduce((count, candidate) => {
+      if (
+        candidate.pair.id === node.pair.id ||
+        candidate.groupId === node.groupId ||
+        node.opponents.has(candidate.pair.id)
+      ) {
+        return count;
+      }
 
-  for (const currentTarget of attemptTargets) {
-    const result = buildForTarget(currentTarget);
-    if (result.length > bestMatches.length) {
-      bestMatches = result;
+      return count + 1;
+    }, 0);
+
+  const buildGreedyFixtures = (nodes) => {
+    const matches = [];
+    const guardLimit = Math.max(1, nodes.length * nodes.length * Math.max(baseTarget, 1) * 4);
+
+    const pickCurrent = () =>
+      nodes
+        .filter((node) => node.need > 0)
+        .map((node) => ({ node, candidates: candidateCount(node, nodes) }))
+        .sort((left, right) => {
+          const leftLabel = left.node.label || '';
+          const rightLabel = right.node.label || '';
+          return (
+            left.candidates - right.candidates ||
+            right.node.need - left.node.need ||
+            leftLabel.localeCompare(rightLabel) ||
+            left.node.pair.id.localeCompare(right.node.pair.id)
+          );
+        })[0]?.node || null;
+
+    const pickCandidate = (currentNode) =>
+      nodes
+        .filter(
+          (node) =>
+            node.pair.id !== currentNode.pair.id &&
+            node.groupId !== currentNode.groupId &&
+            !currentNode.opponents.has(node.pair.id),
+        )
+        .sort((left, right) => {
+          const leftCandidates = candidateCount(left, nodes);
+          const rightCandidates = candidateCount(right, nodes);
+          const leftLabel = left.label || '';
+          const rightLabel = right.label || '';
+          return (
+            right.need - left.need ||
+            leftCandidates - rightCandidates ||
+            leftLabel.localeCompare(rightLabel) ||
+            left.pair.id.localeCompare(right.pair.id)
+          );
+        })[0] || null;
+
+    for (let guard = 0; guard < guardLimit; guard += 1) {
+      const currentNode = pickCurrent();
+      if (!currentNode) {
+        break;
+      }
+
+      const candidateNode = pickCandidate(currentNode);
+      if (!candidateNode) {
+        currentNode.need = 0;
+        continue;
+      }
+
+      addFixture(matches, currentNode, candidateNode);
     }
+
+    return matches;
+  };
+
+  if (groups.length === 2) {
+    const [groupA, groupB] = groups;
+    const groupANodes = groupA.pairIds.map((pairId) => createNode(pairById.get(pairId) || { id: pairId }, groupA.id, baseTarget));
+    const groupBNodes = groupB.pairIds.map((pairId) => createNode(pairById.get(pairId) || { id: pairId }, groupB.id, baseTarget));
+    const leftTotal = groupANodes.length * baseTarget;
+    const rightTotal = groupBNodes.length * baseTarget;
+    const lowerNodes = leftTotal > rightTotal ? groupBNodes : groupANodes;
+    const upperCount = leftTotal > rightTotal ? groupANodes.length : groupBNodes.length;
+    let difference = Math.abs(leftTotal - rightTotal);
+    const extraCapacity = lowerNodes.length * Math.max(0, upperCount - baseTarget);
+
+    if (difference > 0 && difference <= extraCapacity) {
+      const orderedLowerNodes = [...lowerNodes].sort((left, right) => {
+        const leftLabel = left.label || '';
+        const rightLabel = right.label || '';
+        return left.need - right.need || leftLabel.localeCompare(rightLabel) || left.pair.id.localeCompare(right.pair.id);
+      });
+
+      let cursor = 0;
+      while (difference > 0) {
+        const node = orderedLowerNodes[cursor % orderedLowerNodes.length];
+        if (node.need < upperCount) {
+          node.need += 1;
+          difference -= 1;
+        }
+        cursor += 1;
+      }
+
+      return buildGreedyFixtures([...groupANodes, ...groupBNodes]);
+    }
+
+    // Caso límite: si el lado más chico no puede absorber los cruces extra
+    // sin superar la cantidad de rivales disponibles, no existe una igualación
+    // exacta sin relajar la cuota base. En ese caso se usa el greedy genérico.
+    return buildGreedyFixtures([...groupANodes, ...groupBNodes]);
   }
 
-  return bestMatches;
+  const nodes = pairs.map((pair) => createNode(pair, groupByPairId.get(pair.id) || null, baseTarget));
+  return buildGreedyFixtures(nodes);
 };
 
 export const buildStandings = (pairs, matches) => {
