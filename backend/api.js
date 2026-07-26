@@ -318,7 +318,10 @@ const getGroupCount = (pairCount) => {
     return 1;
   }
 
-  return Math.min(pairCount, Math.max(2, Math.ceil(pairCount / 4)));
+  // Límite estructural: cada grupo necesita al menos 2 parejas para poder jugar fixtures internos.
+  // Si no alcanza el total, se reduce la cantidad de grupos hasta que todos cumplan ese mínimo.
+  const maxGroupsWithTwoPairsMinimum = Math.floor(pairCount / 2);
+  return Math.max(1, Math.min(maxGroupsWithTwoPairsMinimum, Math.max(2, Math.ceil(pairCount / 4))));
 };
 
 const parseSnapshot = (snapshotJson) => {
