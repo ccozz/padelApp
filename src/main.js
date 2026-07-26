@@ -9,15 +9,20 @@ import {
   deleteEvent,
   deletePair,
   deletePlayer,
+  getPlayerSession,
   loadState,
+  loginPlayer,
   normalizeText,
   planCategory,
+  logoutPlayer,
+  registerPlayer,
   updateMatch,
   updatePair,
   updatePlayer,
 } from './storage.js';
 
 const tabButtons = document.querySelectorAll('[data-tab]');
+const accountViewButtons = document.querySelectorAll('[data-account-view]');
 const panels = document.querySelectorAll('.panel');
 
 const eventNameDesktop = document.getElementById('eventName');
@@ -41,6 +46,20 @@ const rulesList = document.getElementById('rulesList');
 const pairsList = document.getElementById('pairsList');
 const historyRoot = document.getElementById('historyRoot');
 const appError = document.getElementById('appError');
+const playerAccountAuth = document.getElementById('playerAccountAuth');
+const playerLoginForm = document.getElementById('playerLoginForm');
+const playerRegisterForm = document.getElementById('playerRegisterForm');
+const playerLoginEmail = document.getElementById('playerLoginEmail');
+const playerLoginPassword = document.getElementById('playerLoginPassword');
+const playerRegisterFirstName = document.getElementById('playerRegisterFirstName');
+const playerRegisterLastName = document.getElementById('playerRegisterLastName');
+const playerRegisterAlias = document.getElementById('playerRegisterAlias');
+const playerRegisterEmail = document.getElementById('playerRegisterEmail');
+const playerRegisterPassword = document.getElementById('playerRegisterPassword');
+const playerSessionState = document.getElementById('playerSessionState');
+const playerSessionName = document.getElementById('playerSessionName');
+const playerSessionMeta = document.getElementById('playerSessionMeta');
+const playerLogoutButton = document.getElementById('playerLogoutButton');
 const adminLock = document.getElementById('adminLock');
 const adminContent = document.getElementById('adminContent');
 const adminLoginForm = document.getElementById('adminLoginForm');
@@ -87,8 +106,9 @@ const playersList = document.getElementById('playersList');
 const closePlayersModal = document.getElementById('closePlayersModal');
 const matchEditorList = document.getElementById('matchEditorList');
 
-let appState = defaultState();
+let appState = { ...defaultState(), playerSession: null };
 let activeTab = 'inicio';
+let activeAccountView = 'login';
 let selectedCategoryId = null;
 let themeMode = localStorage.getItem('padelApp.theme') || '';
 
@@ -351,9 +371,10 @@ const normalizeLoadedState = (loadedState) => {
   const nextSelectedCategoryId = preservedCategoryId || loadedState.selectedCategoryId || categories.find((category) => category.status !== 'Torneo archivado')?.id || categories[0]?.id || null;
   const selectedCategory = categories.find((category) => category.id === nextSelectedCategoryId) || null;
 
-  return {
-    ...loadedState,
-    categories,
+    return {
+      ...loadedState,
+      playerSession: loadedState.playerSession ?? appState.playerSession ?? null,
+      categories,
     selectedCategoryId: nextSelectedCategoryId,
     selectedCategory,
     pairs: selectedCategory?.pairs || [],
@@ -369,6 +390,29 @@ const normalizeLoadedState = (loadedState) => {
 const reloadState = async () => {
   const loadedState = await loadState();
   appState = normalizeLoadedState(loadedState);
+};
+
+const setAccountView = (view) => {
+  activeAccountView = view === 'register' ? 'register' : 'login';
+  renderAccountState();
+};
+
+const syncPlayerSession = async () => {
+  try {
+    const response = await getPlayerSession();
+    appState = {
+      ...appState,
+      playerSession: response?.player || null,
+    };
+  } catch (error) {
+    if (error?.status !== 401) {
+      setAppError(error?.message || 'No se pudo validar la sesión de jugador.');
+    }
+    appState = {
+      ...appState,
+      playerSession: null,
+    };
+  }
 };
 
 const setSelectedCategoryId = (categoryId) => {
@@ -864,6 +908,43 @@ const renderRules = () => {
   rulesList.innerHTML = rules.map((rule) => `<li>${escapeHtml(rule)}</li>`).join('');
 };
 
+const renderAccountState = () => {
+  const loggedPlayer = appState.playerSession || null;
+  const hasLoggedPlayer = Boolean(loggedPlayer);
+
+  if (playerAccountAuth) {
+    playerAccountAuth.hidden = hasLoggedPlayer;
+  }
+
+  if (playerSessionState) {
+    playerSessionState.hidden = !hasLoggedPlayer;
+  }
+
+  if (playerSessionName) {
+    playerSessionName.textContent = hasLoggedPlayer ? getPlayerLabel(loggedPlayer) : 'Jugador';
+  }
+
+  if (playerSessionMeta) {
+    playerSessionMeta.textContent = hasLoggedPlayer
+      ? `Sesión iniciada como ${loggedPlayer.email || getPlayerLabel(loggedPlayer)}.`
+      : 'Tu cuenta está activa en esta sesión del navegador.';
+  }
+
+  accountViewButtons.forEach((button) => {
+    const isCurrent = button.dataset.accountView === activeAccountView;
+    button.classList.toggle('is-active', isCurrent);
+    button.setAttribute('aria-pressed', String(isCurrent));
+  });
+
+  if (playerLoginForm) {
+    playerLoginForm.hidden = hasLoggedPlayer || activeAccountView !== 'login';
+  }
+
+  if (playerRegisterForm) {
+    playerRegisterForm.hidden = hasLoggedPlayer || activeAccountView !== 'register';
+  }
+};
+
 const renderPairs = () => {
   if (!pairsList) {
     return;
@@ -1179,10 +1260,11 @@ const renderAll = () => {
   renderGroups();
   renderStandings();
   renderBracket();
-  renderBracketResults();
-  renderRules();
-  renderPairs();
-  renderHistory();
+    renderBracketResults();
+    renderRules();
+    renderAccountState();
+    renderPairs();
+    renderHistory();
   renderAdminState();
   renderPlayersModal();
   renderMatchEditor();
@@ -1429,6 +1511,125 @@ const handleAdminLogout = async () => {
   forceLockAdmin();
   renderAll();
   setActiveTab('admin');
+};
+
+const handleAccountViewClick = (event) => {
+  const button = event.target.closest('[data-account-view]');
+  if (!button) {
+    return;
+  }
+
+  setAccountView(button.dataset.accountView || 'login');
+};
+
+const handlePlayerLoginSubmit = async (event) => {
+  event.preventDefault();
+
+  const form = event.currentTarget;
+  clearFormError(form, 'player-login-form');
+  setBusy(form, true);
+
+  try {
+    const payload = {
+      email: normalizeText(playerLoginEmail?.value || ''),
+      password: String(playerLoginPassword?.value || ''),
+    };
+
+    if (!payload.email || !payload.password) {
+      throw new Error('Ingresá email y contraseña.');
+    }
+
+    const response = await loginPlayer(payload);
+    const player = response?.player || null;
+
+    if (!player) {
+      throw new Error('No se pudo iniciar sesión.');
+    }
+
+    appState = {
+      ...appState,
+      playerSession: player,
+    };
+    if (playerLoginPassword) {
+      playerLoginPassword.value = '';
+    }
+    setAppError('');
+    setAccountView('login');
+    setActiveTab('cuenta');
+    renderAll();
+  } catch (error) {
+    setFormError(
+      form,
+      'player-login-form',
+      error?.status === 401 ? error?.message || 'Credenciales inválidas.' : error?.message || 'No se pudo iniciar sesión.',
+    );
+  } finally {
+    setBusy(form, false);
+  }
+};
+
+const handlePlayerRegisterSubmit = async (event) => {
+  event.preventDefault();
+
+  const form = event.currentTarget;
+  clearFormError(form, 'player-register-form');
+  setBusy(form, true);
+
+  try {
+    const payload = {
+      firstName: normalizeText(playerRegisterFirstName?.value || ''),
+      lastName: normalizeText(playerRegisterLastName?.value || ''),
+      nickname: normalizeText(playerRegisterAlias?.value || ''),
+      email: normalizeText(playerRegisterEmail?.value || ''),
+      password: String(playerRegisterPassword?.value || ''),
+    };
+
+    if (!payload.firstName || !payload.lastName || !payload.email || !payload.password) {
+      throw new Error('Completá nombre, apellido, email y contraseña.');
+    }
+
+    await registerPlayer(payload);
+
+    if (playerRegisterForm) {
+      playerRegisterForm.reset();
+    }
+    if (playerLoginEmail) {
+      playerLoginEmail.value = payload.email;
+    }
+    if (playerLoginPassword) {
+      playerLoginPassword.value = '';
+    }
+    setAccountView('login');
+    setAppError('');
+    setActiveTab('cuenta');
+    renderAll();
+  } catch (error) {
+    setFormError(
+      form,
+      'player-register-form',
+      error?.message || 'No se pudo registrar la cuenta.',
+    );
+  } finally {
+    setBusy(form, false);
+  }
+};
+
+const handlePlayerLogout = async () => {
+  try {
+    await logoutPlayer();
+    appState = {
+      ...appState,
+      playerSession: null,
+    };
+    if (playerLoginPassword) {
+      playerLoginPassword.value = '';
+    }
+    setAccountView('login');
+    setActiveTab('cuenta');
+    renderAll();
+  } catch (error) {
+    setAppError(error?.message || 'No se pudo cerrar la sesión de jugador.');
+  }
 };
 
 const handleCategoryActions = async (event) => {
@@ -1702,6 +1903,9 @@ const attachListeners = () => {
   categoryRail?.addEventListener('click', handleCategoryActions);
   overviewList?.addEventListener('click', handleCategoryActions);
   document.addEventListener('click', handleHistoryActions);
+  accountViewButtons.forEach((button) => {
+    button.addEventListener('click', handleAccountViewClick);
+  });
   matchEditorList?.addEventListener('submit', submitMatchForm);
   adminLoginForm?.addEventListener('submit', handleAdminLogin);
   adminLogout?.addEventListener('click', handleAdminLogout);
@@ -1709,6 +1913,9 @@ const attachListeners = () => {
   categoryForm?.addEventListener('submit', submitCategoryForm);
   playerForm?.addEventListener('submit', submitPlayerForm);
   pairForm?.addEventListener('submit', submitPairForm);
+  playerLoginForm?.addEventListener('submit', handlePlayerLoginSubmit);
+  playerRegisterForm?.addEventListener('submit', handlePlayerRegisterSubmit);
+  playerLogoutButton?.addEventListener('click', handlePlayerLogout);
   deleteEventButton?.addEventListener('click', handleDeleteEvent);
   planCategoryButton?.addEventListener('click', handlePlanCategory);
   archiveCategoryButton?.addEventListener('click', handleArchiveCategory);
@@ -1748,6 +1955,8 @@ const init = async () => {
     }
     forceLockAdmin();
   }
+
+  await syncPlayerSession();
 
   try {
     await reloadState();

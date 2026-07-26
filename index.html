@@ -20,12 +20,13 @@
           <p class="eyebrow">PADELAPP</p>
         </div>
         <button type="button" class="theme-toggle secondary" id="themeToggle">Tema</button>
-        <nav class="sidebar-nav" aria-label="Navegación principal">
-          <button class="tab is-active" data-tab="inicio">Inicio</button>
-          <button class="tab" data-tab="fixture">Fixture</button>
-          <button class="tab" data-tab="tabla">Tabla</button>
-          <button class="tab" data-tab="mas">Más</button>
-        </nav>
+          <nav class="sidebar-nav" aria-label="Navegación principal">
+            <button class="tab is-active" data-tab="inicio">Inicio</button>
+            <button class="tab" data-tab="fixture">Fixture</button>
+            <button class="tab" data-tab="tabla">Tabla</button>
+            <button class="tab" data-tab="cuenta">Cuenta</button>
+            <button class="tab" data-tab="mas">Más</button>
+          </nav>
         <button type="button" class="secondary" data-tab="admin">Admin</button>
       </aside>
 
@@ -127,11 +128,70 @@
             </section>
           </section>
 
-          <section class="panel" id="tab-admin">
-            <div class="section-head">
-              <h2>Panel de admin</h2>
-              <p>Gestión del evento, categorías, jugadores, parejas y resultados.</p>
-            </div>
+            <section class="panel" id="tab-cuenta">
+              <div class="section-head">
+                <h2>Cuenta</h2>
+                <p>Accedé a tu perfil de jugador o creá una cuenta nueva.</p>
+              </div>
+
+              <section class="card block-card" id="playerAccountAuth">
+                <div class="account-switcher" role="tablist" aria-label="Acciones de cuenta">
+                  <button type="button" class="secondary is-active" data-account-view="login">¿Ya tenés cuenta? Iniciá sesión</button>
+                  <button type="button" class="secondary" data-account-view="register">¿No tenés cuenta? Registrate</button>
+                </div>
+
+                <form class="auth-form" id="playerLoginForm" data-account-form="login">
+                  <h3>Iniciar sesión</h3>
+                  <label>
+                    Email
+                    <input id="playerLoginEmail" type="email" autocomplete="email" required />
+                  </label>
+                  <label>
+                    Contraseña
+                    <input id="playerLoginPassword" type="password" autocomplete="current-password" required />
+                  </label>
+                  <button type="submit" class="primary" id="playerLoginButton">Ingresar</button>
+                </form>
+
+                <form class="auth-form" id="playerRegisterForm" data-account-form="register" hidden>
+                  <h3>Crear cuenta</h3>
+                  <label>
+                    Nombre
+                    <input id="playerRegisterFirstName" type="text" autocomplete="given-name" required />
+                  </label>
+                  <label>
+                    Apellido
+                    <input id="playerRegisterLastName" type="text" autocomplete="family-name" required />
+                  </label>
+                  <label>
+                    Alias
+                    <input id="playerRegisterAlias" type="text" autocomplete="nickname" placeholder="Opcional" />
+                  </label>
+                  <label>
+                    Email
+                    <input id="playerRegisterEmail" type="email" autocomplete="email" required />
+                  </label>
+                  <label>
+                    Contraseña
+                    <input id="playerRegisterPassword" type="password" autocomplete="new-password" required />
+                  </label>
+                  <button type="submit" class="primary" id="playerRegisterButton">Registrarme</button>
+                </form>
+              </section>
+
+              <section class="card block-card" id="playerSessionState" hidden>
+                <span class="card-label">Sesión iniciada</span>
+                <h3 id="playerSessionName">Jugador</h3>
+                <p id="playerSessionMeta">Tu cuenta está activa en esta sesión del navegador.</p>
+                <button type="button" class="secondary is-danger" id="playerLogoutButton">Cerrar sesión</button>
+              </section>
+            </section>
+
+            <section class="panel" id="tab-admin">
+              <div class="section-head">
+                <h2>Panel de admin</h2>
+                <p>Gestión del evento, categorías, jugadores, parejas y resultados.</p>
+              </div>
 
             <section class="auth-card card" id="adminLock">
               <h3>Acceso de administrador</h3>
@@ -311,12 +371,13 @@
       </div>
     </div>
 
-    <nav class="bottom-nav card" aria-label="Navegación principal">
-      <button class="tab is-active" data-tab="inicio">Inicio</button>
-      <button class="tab" data-tab="fixture">Fixture</button>
-      <button class="tab" data-tab="tabla">Tabla</button>
-      <button class="tab" data-tab="mas">Más</button>
-    </nav>
+      <nav class="bottom-nav card" aria-label="Navegación principal">
+        <button class="tab is-active" data-tab="inicio">Inicio</button>
+        <button class="tab" data-tab="fixture">Fixture</button>
+        <button class="tab" data-tab="tabla">Tabla</button>
+        <button class="tab" data-tab="cuenta">Cuenta</button>
+        <button class="tab" data-tab="mas">Más</button>
+      </nav>
 
     <section class="modal-shell is-hidden" id="playersModal" hidden aria-hidden="true">
       <div class="modal-backdrop" data-modal-close></div>

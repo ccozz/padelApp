@@ -44,6 +44,25 @@ const requestJson = async (path, options = {}) => {
   return payload;
 };
 
+export const getPlayerSession = () => requestJson('/players/me');
+
+export const loginPlayer = (payload) =>
+  requestJson('/players/login', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const registerPlayer = (payload) =>
+  requestJson('/players/register', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const logoutPlayer = () =>
+  requestJson('/players/logout', {
+    method: 'POST',
+  });
+
 const normalizePlayerRecord = (player) => {
   const firstName = toTrimmedString(player?.firstName ?? player?.first_name ?? '');
   const lastName = toTrimmedString(player?.lastName ?? player?.last_name ?? '');
