@@ -24,6 +24,14 @@ const getTableColumns = (db, tableName) => {
   return db.prepare(`PRAGMA table_info(${tableName})`).all().map((column) => column.name);
 };
 
+const getForeignKeyList = (db, tableName) => {
+  if (!tableExists(db, tableName)) {
+    return [];
+  }
+
+  return db.prepare(`PRAGMA foreign_key_list(${tableName})`).all();
+};
+
 const runSchemaStatements = (db, statements, stepLabel) => {
   if (!statements.length) {
     return;
@@ -138,6 +146,58 @@ const migrateCategorySchema = (db) => {
     } catch (error) {
       throw new Error(`Database bootstrap failed during category schema migration: ${error.message}`);
     }
+  }
+};
+
+const migratePairPlayerForeignKeys = (db) => {
+  const pairColumns = getTableColumns(db, 'pairs');
+  if (!pairColumns.includes('category_id') || !pairColumns.includes('player_one_id') || !pairColumns.includes('player_two_id')) {
+    return;
+  }
+
+  const foreignKeys = getForeignKeyList(db, 'pairs');
+  const playerOneForeignKey = foreignKeys.find((row) => row.from === 'player_one_id');
+  const playerTwoForeignKey = foreignKeys.find((row) => row.from === 'player_two_id');
+
+  if (playerOneForeignKey?.on_delete === 'RESTRICT' && playerTwoForeignKey?.on_delete === 'RESTRICT') {
+    return;
+  }
+
+  const pairs = db.prepare('SELECT * FROM pairs ORDER BY id ASC').all();
+
+  db.exec('PRAGMA foreign_keys = OFF');
+  db.exec('BEGIN IMMEDIATE');
+
+  try {
+    db.exec(`
+      CREATE TABLE pairs_new (
+        id TEXT PRIMARY KEY,
+        category_id TEXT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        player_one_id TEXT NOT NULL REFERENCES players(id) ON DELETE RESTRICT,
+        player_two_id TEXT NOT NULL REFERENCES players(id) ON DELETE RESTRICT
+      );
+    `);
+
+    const insertPair = db.prepare(
+      `
+        INSERT INTO pairs_new (id, category_id, name, player_one_id, player_two_id)
+        VALUES (?, ?, ?, ?, ?)
+      `,
+    );
+
+    pairs.forEach((pair) => {
+      insertPair.run(pair.id, pair.category_id, pair.name, pair.player_one_id, pair.player_two_id);
+    });
+
+    db.exec('DROP TABLE pairs');
+    db.exec('ALTER TABLE pairs_new RENAME TO pairs');
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw new Error(`Database bootstrap failed during pairs foreign key migration: ${error.message}`);
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
   }
 };
 
@@ -346,6 +406,12 @@ export const openDatabase = () => {
       migrateLegacyTournamentModel(db);
     } catch (error) {
       throw new Error(`Database bootstrap failed during legacy migration: ${error.message}`);
+    }
+
+    try {
+      migratePairPlayerForeignKeys(db);
+    } catch (error) {
+      throw new Error(`Database bootstrap failed during pairs foreign key migration: ${error.message}`);
     }
 
     runSchemaStatements(db, indexSchemaStatements, 'create indexes');

@@ -981,8 +981,16 @@ export const createApiRouter = (db) => {
       return jsonError(res, 404, 'Player not found');
     }
 
-    db.prepare('DELETE FROM players WHERE id = ?').run(req.params.id);
-    return jsonOk(res, { ok: true });
+    try {
+      db.prepare('DELETE FROM players WHERE id = ?').run(req.params.id);
+      return jsonOk(res, { ok: true });
+    } catch (error) {
+      if (error?.code === 'SQLITE_CONSTRAINT_FOREIGNKEY' || /FOREIGN KEY constraint failed/i.test(error?.message || '')) {
+        return jsonError(res, 409, 'No se puede eliminar: el jugador tiene una pareja asignada. Eliminá o reasigná la pareja primero.');
+      }
+
+      return jsonError(res, 500, error?.message || 'Unable to delete player');
+    }
   });
 
   router.post('/players/register', async (req, res) => {
